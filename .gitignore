@@ -1,3 +1,4 @@
 supervise
 log/supervise
 log/main
+log/quiet
