@@ -1,0 +1,98 @@
+The Rate Limiter
+================
+
+The Rate Limiter consists of a single server and many clients.  Each
+transaction consists of a client request and a server response, and in
+protocol terms is independent of all other transactions.
+
+The server presents a single endpoint, which is a UDP socket.  Thus each
+request consists of a single UDP packet from client to server, followed by a
+single UDP packet from server to client.
+
+The protocol does not include any form of security: all request packets
+received by the client or server are assumed to be trustworthy.
+
+Requests
+========
+
+Each packet consists of an optional request ID, a mandatory request command,
+and optional request parameters.
+
+Request ID
+----------
+
+To match responses to requests, the client SHOULD generate a request ID (a
+non-negative integer), then precede the request by the ID and a space.  If the
+server decides to send a response (and if the request also included a request
+ID) then the response will be preceded by the request ID (and a space).
+
+Example of a transaction without a request ID:
+
+  get_stats some-key                                # request
+  n_req=2 over=1 last_max_rate=1 key=some-key       # response
+
+The same thing with a request ID:
+
+  78229 get_stats some-key                          # request
+  78229 n_req=2 over=1 last_max_rate=1 key=some-key # response
+
+Request commands
+----------------
+
+The body of the request should match one of the request types listed below.
+Any unrecognised request is ignored, and no response is sent.
+
+over_limit
+----------
+
+Arguments: key
+
+Response: ok %s %.1f %.1f %d
+      Y/N; rate; limit; period.
+
+Tries to make one "use" of the given key.
+
+Y/N: Y if the key is over its limit, N if not (thus, a "Y" response might
+indicate to the client that the user's request should be rejected).
+
+The rate, limit and period describe the current rate, and the limit, for this
+key.
+
+get_stats
+---------
+
+Arguments: key
+
+Response: n_req=%d n_over=%d last_max_rate=%d key=%s
+
+get_size
+--------
+
+Arguments: none
+
+Response: size=%s keys=%d
+
+Client processing
+=================
+
+Responses which include a request ID, but which did not match an unreplied
+request, should be ignored.
+
+In the case of "over_limit", if no matching response has been received within
+some timeout chosen by the client (e.g. 0.1 seconds), then the client MAY
+behave as though "over_limit N ..." had been received.
+
+Examples
+========
+
+">>" represents a request, "<<" represents a response.
+
+    >> 1173 over_limit ws global
+    << 1173 ok N 2034.3 2500.0 10
+
+    >> 472 over_limit ws ip=74.11.99.155
+    << 472 ok N 1.4 22.0 20
+
+    >> 1332 over_limit ws ip=4.14.989.98
+    << 1332 ok Y 28.1 22.0 20
+
