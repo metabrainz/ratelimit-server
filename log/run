@@ -1,0 +1,14 @@
+#!/bin/sh
+DIR=./main
+USER=nobody
+# "main" is the busy log - one line per request/response pair
+# "quiet" is the quiet log - only exceptional events (e.g. stop/start/error) are logged
+install -d -o $USER -m 0700 $DIR
+install -d -o $USER -m 0700 ./quiet
+exec setuidgid $USER multilog t \
+	+'*' \
+	s1000000 n10 $DIR \
+	-'* << *' \
+	-'* new bucket started*' \
+	s1000000 n10 ./quiet \
+

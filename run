@@ -1,0 +1,5 @@
+#!/bin/sh
+exec 2>&1 \
+        softlimit -m 40000000 \
+        setuidgid nobody \
+        ./mb_server/bin/ratelimit-server 10.1.1.245 2000
