@@ -26,9 +26,9 @@ e.g.
 	./request get_size
 
 Slightly less crap version:
-"./mb_server/bin/ratelimit-client ADDR PORT QUERY"
+"./ratelimit-client ADDR PORT QUERY"
 e.g.
-	"./mb_server/bin/ratelimit-client 10.1.1.245 2000 get_size"
+	"./ratelimit-client 10.1.1.245 2000 get_size"
 
 snmp
 ====
