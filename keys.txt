@@ -1,0 +1,15 @@
+# Catalyst root controller
+frontend ip=x.x.x.x
+	-> "frontend cust=bbc" for BBC IP ranges
+
+# /ws/1 or /ws/2
+ws ua=x
+	-> "ws ua=generic-bad-ua" for various UAs
+ws ip=x.x.x.x
+	-> "ws cust=bbc" for BBC IP ranges
+ws global
+
+# search.musicbrainz.org
+search ip=x.x.x.x
+	-> "search cust=bbc" for BBC IP ranges
+
