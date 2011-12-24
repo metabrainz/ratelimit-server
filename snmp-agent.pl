@@ -4,7 +4,9 @@
 use warnings;
 use strict;
 
-use lib "./mb_server/cgi-bin";
+use FindBin;
+use lib "$FindBin::Bin/lib";
+
 use MusicBrainz::Server::RateLimitClient;
 use SNMPAgentUtil;
 
