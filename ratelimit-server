@@ -160,7 +160,7 @@ sub process_request_2
 			#############################
 
 			# MusicBrainz::Server::Handlers::WS::1::Common
-			($limit, $period, $strict) = (2500, 10, 0), last
+			($limit, $period, $strict) = (3000, 10, 0), last
 				if $key =~ /^ws global$/;
 
 			($limit, $period, $strict) = (30, 30, 0), last
