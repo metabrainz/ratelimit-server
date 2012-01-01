@@ -10,8 +10,8 @@ require_ok("RateLimitServer");
 subtest "request id" => sub {
 	plan tests => 8;
 
-	my $req = "get_size";
-	my $ans = "size=0 keys=0";
+	my $req = "ping";
+	my $ans = "pong";
 
 	is RateLimitServer::process_request($req), $ans, "request without an id";
 	is RateLimitServer::process_request("27823 $req"), "27823 $ans", "request with an id";
@@ -28,9 +28,11 @@ subtest "request id" => sub {
 	is RateLimitServer::process_request("394769760968709384567 $req"), $ans, "bad request with a large id";
 };
 
-subtest "ping" => sub {
-	plan tests => 2;
+subtest "fussiness" => sub {
+	plan tests => 4;
 
 	is RateLimitServer::process_request("ping"), "pong", "ping";
 	is RateLimitServer::process_request("PING"), undef, "requests are case-sensitive";
+	is RateLimitServer::process_request(" ping"), undef, "requests are sensitive to leading space";
+	is RateLimitServer::process_request("ping "), undef, "requests are sensitive to trailing space";
 };
