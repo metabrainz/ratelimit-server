@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 4;
+use Test::More tests => 5;
 require_ok("RateLimitServer");
 
 subtest "request id" => sub {
@@ -75,5 +75,37 @@ subtest "basic strict limit" => sub {
 	}
 
 	like RateLimitServer::process_request("get_size"), qr{^size=1/\d+ keys=1$}, "size with 1 key";
+};
+
+subtest "basic leaky limit" => sub {
+	plan tests => 202;
+
+	my $key = "ws ua=libvlc";
+	$t = time();
+
+	# 125 requests in 10 seconds, strict.
+
+	# Send 200 requests over 20 seconds: they should all succeed
+	for (1..200) {
+		my $resp = RateLimitServer::process_request("over_limit $key");
+		like $resp, qr/^ok N /, "under limit $_ of 300";
+		note $resp;
+		$t += 0.1;
+	}
+
+	# Now send 200 requests over 10 seconds.
+	# Some will succeed, some will fail.
+	# (Specifically the first few all succeed, then it's a mix of success and
+	# failure - but FIXME we don't test this detail, just the final count).
+	my $over = 0;
+	for (1..200) {
+		my $resp = RateLimitServer::process_request("over_limit $key");
+		++$over if $resp =~ m/^ok Y /;
+		note $resp;
+		$t += 0.05;
+	}
+	is $over, 44, "44 of 200 were over the limit";
+
+	like RateLimitServer::process_request("get_size"), qr{^size=\d+/\d+ keys=2$}, "size with 2 keys";
 };
 
