@@ -120,3 +120,10 @@ subtest "basic leaky limit" => sub {
 	is $n2, 6, "6/10 last responses succeed";
 };
 
+# TODO, "generic" things to test:
+# get_size
+# keep_stats / get_stats
+
+# TODO, "custom" things to test:
+# request munging
+
