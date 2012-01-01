@@ -41,6 +41,9 @@ disabled by default.
 
 package RateLimitServer;
 
+use Time::HiRes qw( time );
+sub now { time() }
+
 our $verbose;
 
 sub run
@@ -238,8 +241,7 @@ sub do_ratelimit
 		if $verbose;
 
 	no integer;
-	use Time::HiRes qw( time );
-	my $now = time();
+	my $now = now();
 
 	my $dbd_time;
 	my $dbd_rate;
@@ -314,7 +316,7 @@ sub do_ratelimit
 
 	sub check_next_bucket
 	{
-		my $now = time;
+		my $now = now();
 		if (not $next_bucket or $now >= $next_bucket)
 		{
 			clear_max_rate();
