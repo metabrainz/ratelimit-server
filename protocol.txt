@@ -72,6 +72,13 @@ Arguments: none
 
 Response: size=%s keys=%d
 
+ping
+----
+
+Arguments: none
+
+Response: pong
+
 Client processing
 =================
 
