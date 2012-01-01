@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 3;
+use Test::More tests => 4;
 require_ok("RateLimitServer");
 
 subtest "request id" => sub {
@@ -39,3 +39,41 @@ subtest "fussiness" => sub {
 	is RateLimitServer::process_request("123 ping"), "123 pong", "ping with id";
 	is RateLimitServer::process_request("123  ping"), undef, "request id is sensitive to whitespace";
 };
+
+# We'll be overriding things in the RateLimitServer package
+no warnings qw( redefine once );
+our $t;
+local *RateLimitServer::now = sub { $t };
+
+subtest "basic strict limit" => sub {
+	plan tests => 401;
+
+	my $key = "ws ip=193.195.43.199";
+	$t = time();
+
+	# 22 requests in 20 seconds, strict.
+
+	# Send 300 requests 1 second apart: they should all succeed
+	for (1..300) {
+		my $resp = RateLimitServer::process_request("over_limit $key");
+		like $resp, qr/^ok N /, "under limit $_ of 300";
+		note $resp;
+		$t += 1;
+	}
+
+	# Now send 100 requests in 10 seconds, to force us over the limit
+	# The first few will succeed, the rest will fail
+	for (1..100) {
+		my $resp = RateLimitServer::process_request("over_limit $key");
+		if ($_ <= 3) {
+			like $resp, qr/^ok N /, "under limit $_ of 300";
+		} else {
+			like $resp, qr/^ok Y /, "over limit $_ of 300";
+		}
+		note $resp;
+		$t += 0.1;
+	}
+
+	like RateLimitServer::process_request("get_size"), qr{^size=1/\d+ keys=1$}, "size with 1 key";
+};
+
