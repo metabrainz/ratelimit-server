@@ -214,6 +214,10 @@ sub process_request_2
 	{
 		return get_size();
 	}
+	elsif ($request eq "ping")
+	{
+		return "pong";
+	}
 
 	return undef;
 }

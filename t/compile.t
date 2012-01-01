@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 2;
+use Test::More tests => 3;
 require_ok("RateLimitServer");
 
 subtest "request id" => sub {
@@ -28,3 +28,9 @@ subtest "request id" => sub {
 	is RateLimitServer::process_request("394769760968709384567 $req"), $ans, "bad request with a large id";
 };
 
+subtest "ping" => sub {
+	plan tests => 2;
+
+	is RateLimitServer::process_request("ping"), "pong", "ping";
+	is RateLimitServer::process_request("PING"), undef, "requests are case-sensitive";
+};
