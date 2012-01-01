@@ -46,10 +46,16 @@ our $t;
 local *RateLimitServer::now = sub { $t };
 
 subtest "basic strict limit" => sub {
-	plan tests => 401;
+	plan tests => 400;
 
-	my $key = "ws ip=193.195.43.199";
+	my $key = "dummy";
 	$t = time();
+
+	local *RateLimitServer::find_ratelimit_params = sub {
+		$_[0] eq $key or die "unexpected key @_";
+	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+		return (undef, undef, 22, 20, 1, $key, 0);
+	};
 
 	# 22 requests in 20 seconds, strict.
 
@@ -73,17 +79,21 @@ subtest "basic strict limit" => sub {
 		note $resp;
 		$t += 0.1;
 	}
-
-	like RateLimitServer::process_request("get_size"), qr{^size=1/\d+ keys=1$}, "size with 1 key";
 };
 
 subtest "basic leaky limit" => sub {
-	plan tests => 203;
+	plan tests => 202;
 
-	my $key = "ws ua=libvlc";
+	my $key = "dummy";
 	$t = time();
 
-	# 125 requests in 10 seconds, strict.
+	local *RateLimitServer::find_ratelimit_params = sub {
+		$_[0] eq $key or die "unexpected key @_";
+	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+		return (undef, undef, 125, 10, 0, $key, 0);
+	};
+
+	# 125 requests in 10 seconds, leaky.
 
 	# Send 200 requests over 20 seconds: they should all succeed
 	for (1..200) {
@@ -108,7 +118,5 @@ subtest "basic leaky limit" => sub {
 	is $n1, 30, "first 30 responses all succeed";
 	my $n2 = grep /^ok N /, @responses[-10..-1];
 	is $n2, 6, "6/10 last responses succeed";
-
-	like RateLimitServer::process_request("get_size"), qr{^size=\d+/\d+ keys=2$}, "size with 2 keys";
 };
 
