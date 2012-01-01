@@ -144,17 +144,33 @@ sub over_limit
 {
 	my ($key) = @_;
 
+	my ($over_limit, $rate, $limit, $period, $strict, $new_key, $keep_stats) = find_ratelimit_params($key);
+
+	($over_limit, $rate) = do_ratelimit($limit, $period, $key, 1, $strict)
+		if not defined $over_limit;
+
+	keep_stats($limit, $period, $key, $over_limit, $rate)
+		if $keep_stats;
+
+	return sprintf "ok %s %.1f %.1f %d",
+		($over_limit ? "Y" : "N"), $rate, $limit, $period;
+}
+
+sub find_ratelimit_params
+{
+	my ($key) = @_;
+
+	# The server - that's us - gets to decide what limits to impose for
+	# each key.  The idea is that this makes it easier to adjust the
+	# limits on the fly - simply tweak this script and restart it.
+
 	$key =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
 	$key =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
 
 	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
 
-	# The server - that's us - gets to decide what limits to impose for
-	# each key.  The idea is that this makes it easier to adjust the
-	# limits on the fly - simply tweak this script and restart it.
-
-	my ($over_limit, $rate, $limit, $period, $strict);
+	my ($over_limit, $rate, $limit, $period, $strict, $keep_stats);
 
 	{
 		#############################
@@ -187,6 +203,8 @@ sub over_limit
 		# Shared limits: not strict
 		#############################
 
+		$keep_stats = 1;
+
 		# MusicBrainz::Server::Handlers::WS::1::Common
 		($limit, $period, $strict) = (3000, 10, 0), last
 			if $key =~ /^ws global$/;
@@ -212,19 +230,11 @@ sub over_limit
 			if $key =~ /^ws ua=-$/;
 
 		# Default is to allow everything
+		$key = "default";
 		($over_limit, $rate, $limit, $period) = (0, 0, 1, 1);
 	}
 
-	($over_limit, $rate) = do_ratelimit($limit, $period, $key, 1, $strict)
-		if not defined $over_limit;
-
-	if ($key =~ /^ws (global|ua=|cust=)/)
-	{
-		keep_stats($limit, $period, $key, $over_limit, $rate);
-	}
-
-	return sprintf "ok %s %.1f %.1f %d",
-		($over_limit ? "Y" : "N"), $rate, $limit, $period;
+	return ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
 }
 
 use Carp qw( croak );
