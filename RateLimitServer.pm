@@ -120,15 +120,15 @@ sub process_request_2
 {
 	my ($request, $peer) = @_;
 
+	$request =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
+	$request =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
+
+	$request =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
+		unless $request =~ m{\Q ua=python-musicbrainz/0.7.3\E};
+
 	if ($request =~ /^over_limit (.*)$/)
 	{
 		my $key = $1;
-
-		$request =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
-		$request =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
-
-		$request =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
-			unless $request =~ m{\Q ua=python-musicbrainz/0.7.3\E};
 
 		# The server - that's us - gets to decide what limits to impose for
 		# each key.  The idea is that this makes it easier to adjust the
