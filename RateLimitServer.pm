@@ -210,7 +210,7 @@ sub process_request_2
 	{
 		return get_stats($1);
 	}
-	elsif ($request =~ /^get_size$/)
+	elsif ($request eq "get_size")
 	{
 		return get_size();
 	}
