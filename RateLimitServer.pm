@@ -86,7 +86,7 @@ sub run
 		my $reply = process_request($request, $peer);
 		if (not defined $reply)
 		{
-			print "no reply\n";
+			print "no reply (>> $request)\n";
 			next;
 		}
 		print "<< $reply (>> $request)\n";
