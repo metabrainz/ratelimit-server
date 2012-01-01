@@ -29,10 +29,13 @@ subtest "request id" => sub {
 };
 
 subtest "fussiness" => sub {
-	plan tests => 4;
+	plan tests => 6;
 
 	is RateLimitServer::process_request("ping"), "pong", "ping";
 	is RateLimitServer::process_request("PING"), undef, "requests are case-sensitive";
 	is RateLimitServer::process_request(" ping"), undef, "requests are sensitive to leading space";
 	is RateLimitServer::process_request("ping "), undef, "requests are sensitive to trailing space";
+
+	is RateLimitServer::process_request("123 ping"), "123 pong", "ping with id";
+	is RateLimitServer::process_request("123  ping"), undef, "request id is sensitive to whitespace";
 };
