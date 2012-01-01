@@ -78,7 +78,7 @@ subtest "basic strict limit" => sub {
 };
 
 subtest "basic leaky limit" => sub {
-	plan tests => 202;
+	plan tests => 203;
 
 	my $key = "ws ua=libvlc";
 	$t = time();
@@ -95,16 +95,19 @@ subtest "basic leaky limit" => sub {
 
 	# Now send 200 requests over 10 seconds.
 	# Some will succeed, some will fail.
-	# (Specifically the first few all succeed, then it's a mix of success and
-	# failure - but FIXME we don't test this detail, just the final count).
-	my $over = 0;
+	my @responses;
 	for (1..200) {
 		my $resp = RateLimitServer::process_request("over_limit $key");
-		++$over if $resp =~ m/^ok Y /;
+		push @responses, $resp;
 		note $resp;
 		$t += 0.05;
 	}
-	is $over, 44, "44 of 200 were over the limit";
+	# Specifically the first few all succeed, then it's a mix of success and
+	# failure
+	my $n1 = grep /^ok N /, @responses[0..29];
+	is $n1, 30, "first 30 responses all succeed";
+	my $n2 = grep /^ok N /, @responses[-10..-1];
+	is $n2, 6, "6/10 last responses succeed";
 
 	like RateLimitServer::process_request("get_size"), qr{^size=\d+/\d+ keys=2$}, "size with 2 keys";
 };
