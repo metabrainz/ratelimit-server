@@ -330,4 +330,5 @@ sub do_ratelimit
 
 run(@ARGV) unless caller;
 
+1;
 # eof RateLimitServer.pm
