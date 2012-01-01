@@ -219,7 +219,7 @@ use Carp qw( croak );
 
 # At the moment the data store is all in memory, though this could easily be
 # changed to something DBM-ish if that proves necessary.
-my %hash;
+our %hash;
 
 sub get_size
 {
