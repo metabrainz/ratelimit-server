@@ -2,4 +2,4 @@
 exec 2>&1 \
         softlimit -m 40000000 \
         setuidgid nobody \
-        ./ratelimit-server 10.1.1.245 2000
+        ./RateLimitServer.pm 10.1.1.245 2000

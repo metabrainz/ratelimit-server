@@ -39,62 +39,67 @@ disabled by default.
 
 =cut
 
-@ARGV == 2 or die "Usage: $0 ADDR PORT\n";
-my ($addr, $port) = @ARGV;
+package RateLimitServer;
 
-my $verbose = $ENV{VERBOSE};
+our $verbose;
 
-use IO::Socket::INET;
-my $sock = IO::Socket::INET->new(
-	Proto => 'udp',
-	LocalPort => $port,
-	LocalAddr => $addr,
-) or die $!;
-
-my $stop = 0;
-$SIG{TERM} = sub { $stop = 1 };
-$SIG{INT} = $SIG{TERM} if -t;
-
-$| = 1;
-print "starting\n";
-
-check_next_bucket();
-
-for (;;)
+sub run
 {
-	last if $stop;
+	@_ == 2 or die "Usage: $0 ADDR PORT\n";
+	my ($addr, $port) = @_;
 
-	my $request;
-	my $peer = recv($sock, $request, 1000, 0);
-	if (not defined $peer)
+	local $verbose = $ENV{VERBOSE};
+
+	use IO::Socket::INET;
+	my $sock = IO::Socket::INET->new(
+		Proto => 'udp',
+		LocalPort => $port,
+		LocalAddr => $addr,
+	) or die $!;
+
+	my $stop = 0;
+	$SIG{TERM} = sub { $stop = 1 };
+	$SIG{INT} = $SIG{TERM} if -t;
+
+	$| = 1;
+	print "starting\n";
+
+	check_next_bucket();
+
+	for (;;)
 	{
-		next if $!{EINTR};
-		die "recv: $!";
+		last if $stop;
+
+		my $request;
+		my $peer = recv($sock, $request, 1000, 0);
+		if (not defined $peer)
+		{
+			next if $!{EINTR};
+			die "recv: $!";
+		}
+
+		$request =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
+		$request =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
+
+		$request =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
+			unless $request =~ m{\Q ua=python-musicbrainz/0.7.3\E};
+
+		print ">> $request\n"
+			if $verbose;
+		my $reply = process_request($request, $peer);
+		if (not defined $reply)
+		{
+			print "no reply\n";
+			next;
+		}
+		print "<< $reply (>> $request)\n";
+
+		my $r = send($sock, $reply, 0, $peer);
+		defined($r) or die "send: $!";
 	}
 
-	$request =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
-	$request =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
-
-	$request =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
-		unless $request =~ m{\Q ua=python-musicbrainz/0.7.3\E};
-
-	print ">> $request\n"
-		if $verbose;
-	my $reply = process_request($request, $peer);
-	if (not defined $reply)
-	{
-		print "no reply\n";
-		next;
-	}
-	print "<< $reply (>> $request)\n";
-
-	my $r = send($sock, $reply, 0, $peer);
-	defined($r) or die "send: $!";
+	print "exiting\n";
 }
-
-print "exiting\n";
-
-exit;
 
 sub process_request
 {
@@ -323,4 +328,6 @@ sub do_ratelimit
 	}
 }
 
-# eof ratelimit-server
+run(@ARGV) unless caller;
+
+# eof RateLimitServer.pm
