@@ -120,91 +120,9 @@ sub process_request_2
 {
 	my ($request, $peer) = @_;
 
-	$request =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
-	$request =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
-
-	$request =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
-		unless $request =~ m{\Q ua=python-musicbrainz/0.7.3\E};
-
 	if ($request =~ /^over_limit (.*)$/)
 	{
-		my $key = $1;
-
-		# The server - that's us - gets to decide what limits to impose for
-		# each key.  The idea is that this makes it easier to adjust the
-		# limits on the fly - simply tweak this script and restart it.
-
-		my ($over_limit, $rate, $limit, $period, $strict);
-
-		{
-			#############################
-			# Per-user limits: strict
-			#############################
-
-			# MBH-146 Give the BBC a high ratelimit
-			($limit, $period, $strict) = (15*20, 20, 0), last
-				if $key =~ /^(.*) cust=bbc$/;
-
-			# MusicBrainz::Server::Mason
-			($limit, $period, $strict) = (22, 20, 1), last
-				if $key =~ /^mason ip=(\d+\.\d+\.\d+\.\d+)$/;
-
-			# MusicBrainz::Server::Handlers::WS::1::Common
-			($limit, $period, $strict) = (22, 20, 1), last
-				if $key =~ /^ws ip=(\d+\.\d+\.\d+\.\d+)$/;
-
-			# Old web service (cgi-bin/*.pl)
-			($limit, $period, $strict) = (10, 30, 1), last
-				if $key =~ m{^/mm-2.1/Find\w+ ip=(\d+\.\d+\.\d+\.\d+)$};
-			($limit, $period, $strict) = (22, 20, 1), last
-				if $key =~ m{^/mm-2.1/\w+ ip=(\d+\.\d+\.\d+\.\d+)$};
-
-			# Public search server
-			($limit, $period, $strict) = (22, 20, 1), last
-				if $key =~ /^search ip=(\d+\.\d+\.\d+\.\d+)$/;
-
-			#############################
-			# Shared limits: not strict
-			#############################
-
-			# MusicBrainz::Server::Handlers::WS::1::Common
-			($limit, $period, $strict) = (3000, 10, 0), last
-				if $key =~ /^ws global$/;
-
-			($limit, $period, $strict) = (30, 30, 0), last
-				if $key =~ m{^/mm-2.1/Find\w+ global$};
-			($limit, $period, $strict) = (100, 10, 0), last
-				if $key =~ m{^/mm-2.1/\w+ global$};
-
-			# Bad user-agents
-			($limit, $period, $strict) = (500, 10, 0), last
-				if $key eq "ws ua=python-musicbrainz/0.7.3";
-			($limit, $period, $strict) = (500, 10, 0), last
-				if $key eq "ws ua=generic-bad-ua";
-
-			# VLC -- was 100, 30
-			($limit, $period, $strict) = (125, 10, 0), last
-				if $key =~ /^ws ua=(libvlc)$/;
-			($limit, $period, $strict) = (125, 10, 0), last
-				if $key =~ /^ws ua=(nsplayer)$/;
-			# No UA
-			($limit, $period, $strict) = (500, 10, 0), last
-				if $key =~ /^ws ua=-$/;
-
-			# Default is to allow everything
-			($over_limit, $rate, $limit, $period) = (0, 0, 1, 1);
-		}
-
-		($over_limit, $rate) = do_ratelimit($limit, $period, $key, 1, $strict)
-			if not defined $over_limit;
-
-		if ($key =~ /^ws (global|ua=|cust=)/)
-		{
-			keep_stats($limit, $period, $key, $over_limit, $rate);
-		}
-
-		return sprintf "ok %s %.1f %.1f %d",
-			($over_limit ? "Y" : "N"), $rate, $limit, $period;
+		return over_limit($1);
 	}
 	elsif ($request =~ /^get_stats (.*)$/)
 	{
@@ -220,6 +138,93 @@ sub process_request_2
 	}
 
 	return undef;
+}
+
+sub over_limit
+{
+	my ($key) = @_;
+
+	$key =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
+	$key =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
+
+	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
+		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
+
+	# The server - that's us - gets to decide what limits to impose for
+	# each key.  The idea is that this makes it easier to adjust the
+	# limits on the fly - simply tweak this script and restart it.
+
+	my ($over_limit, $rate, $limit, $period, $strict);
+
+	{
+		#############################
+		# Per-user limits: strict
+		#############################
+
+		# MBH-146 Give the BBC a high ratelimit
+		($limit, $period, $strict) = (15*20, 20, 0), last
+			if $key =~ /^(.*) cust=bbc$/;
+
+		# MusicBrainz::Server::Mason
+		($limit, $period, $strict) = (22, 20, 1), last
+			if $key =~ /^mason ip=(\d+\.\d+\.\d+\.\d+)$/;
+
+		# MusicBrainz::Server::Handlers::WS::1::Common
+		($limit, $period, $strict) = (22, 20, 1), last
+			if $key =~ /^ws ip=(\d+\.\d+\.\d+\.\d+)$/;
+
+		# Old web service (cgi-bin/*.pl)
+		($limit, $period, $strict) = (10, 30, 1), last
+			if $key =~ m{^/mm-2.1/Find\w+ ip=(\d+\.\d+\.\d+\.\d+)$};
+		($limit, $period, $strict) = (22, 20, 1), last
+			if $key =~ m{^/mm-2.1/\w+ ip=(\d+\.\d+\.\d+\.\d+)$};
+
+		# Public search server
+		($limit, $period, $strict) = (22, 20, 1), last
+			if $key =~ /^search ip=(\d+\.\d+\.\d+\.\d+)$/;
+
+		#############################
+		# Shared limits: not strict
+		#############################
+
+		# MusicBrainz::Server::Handlers::WS::1::Common
+		($limit, $period, $strict) = (3000, 10, 0), last
+			if $key =~ /^ws global$/;
+
+		($limit, $period, $strict) = (30, 30, 0), last
+			if $key =~ m{^/mm-2.1/Find\w+ global$};
+		($limit, $period, $strict) = (100, 10, 0), last
+			if $key =~ m{^/mm-2.1/\w+ global$};
+
+		# Bad user-agents
+		($limit, $period, $strict) = (500, 10, 0), last
+			if $key eq "ws ua=python-musicbrainz/0.7.3";
+		($limit, $period, $strict) = (500, 10, 0), last
+			if $key eq "ws ua=generic-bad-ua";
+
+		# VLC -- was 100, 30
+		($limit, $period, $strict) = (125, 10, 0), last
+			if $key =~ /^ws ua=(libvlc)$/;
+		($limit, $period, $strict) = (125, 10, 0), last
+			if $key =~ /^ws ua=(nsplayer)$/;
+		# No UA
+		($limit, $period, $strict) = (500, 10, 0), last
+			if $key =~ /^ws ua=-$/;
+
+		# Default is to allow everything
+		($over_limit, $rate, $limit, $period) = (0, 0, 1, 1);
+	}
+
+	($over_limit, $rate) = do_ratelimit($limit, $period, $key, 1, $strict)
+		if not defined $over_limit;
+
+	if ($key =~ /^ws (global|ua=|cust=)/)
+	{
+		keep_stats($limit, $period, $key, $over_limit, $rate);
+	}
+
+	return sprintf "ok %s %.1f %.1f %d",
+		($over_limit ? "Y" : "N"), $rate, $limit, $period;
 }
 
 use Carp qw( croak );
