@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 5;
+use Test::More tests => 6;
 require_ok("RateLimitServer");
 
 subtest "request id" => sub {
@@ -120,8 +120,22 @@ subtest "basic leaky limit" => sub {
 	is $n2, 6, "6/10 last responses succeed";
 };
 
+subtest "get_size" => sub {
+	plan tests => 2;
+
+	local %RateLimitServer::hash = ();
+
+	like RateLimitServer::process_request("get_size"), qr/^size=\S+ keys=0$/, "starts off empty";
+
+	RateLimitServer::do_ratelimit(10, 10, "key 1", 1, 0);
+	RateLimitServer::do_ratelimit(10, 10, "key 1", 1, 0);
+	RateLimitServer::do_ratelimit(10, 10, "key 3", 1, 0);
+	RateLimitServer::do_ratelimit(10, 10, "key 2", 1, 0);
+
+	like RateLimitServer::process_request("get_size"), qr/^size=\S+ keys=3$/, "after 3 keys";
+};
+
 # TODO, "generic" things to test:
-# get_size
 # keep_stats / get_stats
 
 # TODO, "custom" things to test:
