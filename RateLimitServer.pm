@@ -265,11 +265,14 @@ sub do_ratelimit
 
 	my $dbd_time;
 	my $dbd_rate;
+	my $data;
 
-	if (not(my $data = $hash{$key}))
+	if (not($data = $hash{$key}))
 	{
 		printf "ratelimit initializing new key's data\n"
 			if $verbose;
+
+		$data = $hash{$key} = [ $now, 0 ];
 		$dbd_time = $now;
 		$dbd_rate = 0;
 	}
@@ -291,7 +294,8 @@ sub do_ratelimit
 
 	if (not $over_limit or $strict)
 	{
-		$hash{$key} = [ $dbd_time, $dbd_rate ];
+		$data->[0] = $dbd_time;
+		$data->[1] = $dbd_rate;
 	}
 
 	printf "ratelimit computed rate=%s key=%s\n", $dbd_rate, $key
