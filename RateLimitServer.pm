@@ -230,7 +230,7 @@ sub find_ratelimit_params
 			if $key =~ /^ws ua=-$/;
 
 		# Default is to allow everything
-		print "Warning: using default key for << over_limit $_[0]\n";
+		print "Warning: using default key for >> over_limit $_[0]\n";
 		$key = "default";
 		($over_limit, $rate, $limit, $period) = (0, 0, 1, 1);
 	}
