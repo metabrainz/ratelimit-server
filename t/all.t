@@ -4,7 +4,8 @@
 use warnings;
 use strict;
 
-use Test::More tests => 6;
+use Test::More tests => 7;
+
 require_ok("RateLimitServer");
 
 subtest "request id" => sub {
@@ -135,8 +136,41 @@ subtest "get_size" => sub {
 	like RateLimitServer::process_request("get_size"), qr/^size=\S+ keys=3$/, "after 3 keys";
 };
 
+subtest "stats" => sub {
+	plan tests => 3;
+
+	local *RateLimitServer::find_ratelimit_params = sub {
+	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+
+		return (undef, undef, 10, 1, 1, "key_without_stats")
+			if $_[0] eq "key_without_stats";
+
+		return (undef, undef, 10, 1, 1, "key_with_stats", 1)
+			if $_[0] eq "key_with_stats";
+
+		die "unexpected key";
+	};
+
+	is RateLimitServer::process_request("get_stats not_seen_yet"),
+		"n_req=0 n_over=0 last_max_rate=0 key=not_seen_yet",
+		"not_seen_yet";
+
+	for (1..20) {
+		note RateLimitServer::process_request("over_limit key_without_stats");
+		note RateLimitServer::process_request("over_limit key_with_stats");
+	}
+
+	is RateLimitServer::process_request("get_stats key_without_stats"),
+		"n_req=0 n_over=0 last_max_rate=0 key=key_without_stats",
+		"stats for a key where we don't keep stats";
+
+	is RateLimitServer::process_request("get_stats key_with_stats"),
+		"n_req=20 n_over=9 last_max_rate=0 key=key_with_stats",
+		"stats for a key where we do keep stats";
+};
+
 # TODO, "generic" things to test:
-# keep_stats / get_stats
+# "buckets" and last_max_rate
 
 # TODO, "custom" things to test:
 # request munging
