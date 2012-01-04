@@ -209,13 +209,13 @@ subtest "buckets" => sub {
 		note RateLimitServer::process_request("over_limit one");
 		note RateLimitServer::process_request("over_limit two");
 	}
+	$t += 250;
 
 	# last_max_rate is for previous bucket, other stats are for this bucket
 	is RateLimitServer::process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #2 key one";
 	is RateLimitServer::process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=18 key=two", "bucket #2 key two";
 
 	# bucket #3
-	$t += 250;
 	RateLimitServer::check_next_bucket();
 
 	is RateLimitServer::process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #3 key one";
