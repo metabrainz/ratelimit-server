@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 7;
+use Test::More tests => 8;
 
 require_ok("RateLimitServer");
 
@@ -169,8 +169,58 @@ subtest "stats" => sub {
 		"stats for a key where we do keep stats";
 };
 
-# TODO, "generic" things to test:
-# "buckets" and last_max_rate
+subtest "buckets" => sub {
+	plan tests => 6;
+
+	# last_max_rate is for previous bucket, other stats are cumulative
+
+	$t = int time();
+	$t -= ($t % 300);
+	++$t;
+	local $SIG{ALRM} = $SIG{ALRM};
+
+	local *RateLimitServer::find_ratelimit_params = sub {
+	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+		return (undef, undef, 22, 20, 0, $_[0], 1);
+	};
+
+	# bucket #1
+	RateLimitServer::check_next_bucket();
+
+	for (1..50) {
+		$t += 0.5;
+		note RateLimitServer::process_request("over_limit one");
+		$t += 0.5;
+		note RateLimitServer::process_request("over_limit one");
+		note RateLimitServer::process_request("over_limit two");
+	}
+	$t += 250;
+
+	is RateLimitServer::process_request("get_stats one"), "n_req=100 n_over=31 last_max_rate=0 key=one", "bucket #1 key one";
+	is RateLimitServer::process_request("get_stats two"), "n_req=50 n_over=0 last_max_rate=0 key=two", "bucket #1 key two";
+
+	# bucket #2
+	RateLimitServer::check_next_bucket();
+
+	for (1..100) {
+		$t += 0.25;
+		note RateLimitServer::process_request("over_limit one");
+		$t += 0.25;
+		note RateLimitServer::process_request("over_limit one");
+		note RateLimitServer::process_request("over_limit two");
+	}
+
+	# last_max_rate is for previous bucket, other stats are for this bucket
+	is RateLimitServer::process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #2 key one";
+	is RateLimitServer::process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=18 key=two", "bucket #2 key two";
+
+	# bucket #3
+	$t += 250;
+	RateLimitServer::check_next_bucket();
+
+	is RateLimitServer::process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #3 key one";
+	is RateLimitServer::process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=22 key=two", "bucket #3 key two";
+};
 
 # TODO, "custom" things to test:
 # request munging
