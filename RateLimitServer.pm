@@ -228,6 +228,8 @@ sub find_ratelimit_params
 		# No UA
 		($limit, $period, $strict) = (500, 10, 0), last
 			if $key =~ /^ws ua=-$/;
+		($over_limit, $rate, $limit, $period, $key) = (0, 0, 1, 1, "none")
+			if $key =~ /^ws ua=/;
 
 		# Default is to allow everything
 		print "Warning: using default key for >> over_limit $_[0]\n";
