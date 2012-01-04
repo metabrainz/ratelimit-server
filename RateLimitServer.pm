@@ -181,9 +181,9 @@ sub find_ratelimit_params
 		($limit, $period, $strict) = (15*20, 20, 0), last
 			if $key =~ /^(.*) cust=bbc$/;
 
-		# MusicBrainz::Server::Mason
+		# Web pages for humans
 		($limit, $period, $strict) = (22, 20, 1), last
-			if $key =~ /^mason ip=(\d+\.\d+\.\d+\.\d+)$/;
+			if $key =~ /^frontend ip=(\d+\.\d+\.\d+\.\d+)$/;
 
 		# MusicBrainz::Server::Handlers::WS::1::Common
 		($limit, $period, $strict) = (22, 20, 1), last
