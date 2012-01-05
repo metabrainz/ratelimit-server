@@ -43,14 +43,13 @@ subtest "fussiness" => sub {
 
 # We'll be overriding things in the RateLimitServer package
 no warnings qw( redefine once );
-our $t;
+our $t = time();
 local *RateLimitServer::now = sub { $t };
 
 subtest "basic strict limit" => sub {
 	plan tests => 400;
 
 	my $key = "dummy";
-	$t = time();
 
 	local *RateLimitServer::find_ratelimit_params = sub {
 		$_[0] eq $key or die "unexpected key @_";
@@ -86,7 +85,6 @@ subtest "basic leaky limit" => sub {
 	plan tests => 202;
 
 	my $key = "dummy";
-	$t = time();
 
 	local *RateLimitServer::find_ratelimit_params = sub {
 		$_[0] eq $key or die "unexpected key @_";
