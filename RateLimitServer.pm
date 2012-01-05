@@ -146,10 +146,10 @@ sub over_limit
 
 	my ($over_limit, $rate, $limit, $period, $strict, $new_key, $keep_stats) = find_ratelimit_params($key);
 
-	($over_limit, $rate) = do_ratelimit($limit, $period, $key, 1, $strict)
+	($over_limit, $rate) = do_ratelimit($limit, $period, $new_key, 1, $strict)
 		if not defined $over_limit;
 
-	keep_stats($limit, $period, $key, $over_limit, $rate)
+	keep_stats($limit, $period, $new_key, $over_limit, $rate)
 		if $keep_stats;
 
 	return sprintf "ok %s %.1f %.1f %d",
@@ -178,7 +178,7 @@ sub find_ratelimit_params
 		#############################
 
 		# MBH-146 Give the BBC a high ratelimit
-		($limit, $period, $strict) = (15*20, 20, 0), last
+		($limit, $period, $strict, $keep_stats) = (15*20, 20, 0, 1), last
 			if $key =~ /^(.*) cust=bbc$/;
 
 		# Web pages for humans
