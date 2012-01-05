@@ -41,23 +41,45 @@ disabled by default.
 
 package RateLimitServer;
 
+use base qw/ Class::Accessor::Fast /;
+__PACKAGE__->mk_accessors(qw(
+	verbose
+	bind
+	port
+	hash
+	n_req
+	n_over
+	max_rate
+	last_max_rate
+	next_bucket
+));
+
 use Time::HiRes qw( time );
 sub now { time() }
 
 our $verbose;
 
+sub new
+{
+	my ($class, @args) = @_;
+	my $self = $class->SUPER::new(@args);
+	$self->hash({});
+	$self->n_req({});
+	$self->n_over({});
+	$self->max_rate({});
+	$self->last_max_rate({});
+	return $self;
+}
+
 sub run
 {
-	@_ == 2 or die "Usage: $0 ADDR PORT\n";
-	my ($addr, $port) = @_;
-
-	local $verbose = $ENV{VERBOSE};
+	my $self = shift;
 
 	use IO::Socket::INET;
 	my $sock = IO::Socket::INET->new(
 		Proto => 'udp',
-		LocalPort => $port,
-		LocalAddr => $addr,
+		LocalPort => $self->port,
+		LocalAddr => $self->bind,
 	) or die $!;
 
 	my $stop = 0;
@@ -67,7 +89,7 @@ sub run
 	$| = 1;
 	print "starting\n";
 
-	check_next_bucket();
+	$self->check_next_bucket;
 
 	for (;;)
 	{
@@ -82,8 +104,8 @@ sub run
 		}
 
 		print ">> $request\n"
-			if $verbose;
-		my $reply = process_request($request, $peer);
+			if $self->verbose;
+		my $reply = $self->process_request($request, $peer);
 		if (not defined $reply)
 		{
 			print "no reply (>> $request)\n";
@@ -100,7 +122,7 @@ sub run
 
 sub process_request
 {
-	my ($request, $peer) = @_;
+	my ($self, $request, $peer) = @_;
 
 	my $id;
 	if ($request =~ /\A(\d+) (.*)/s)
@@ -109,7 +131,7 @@ sub process_request
 		$request = $2;
 	}
 
-	my $response = process_request_2($request, $peer);
+	my $response = $self->process_request_2($request, $peer);
 
 	$response = "$id $response" if defined($response) and defined($id);
 
@@ -118,19 +140,19 @@ sub process_request
 
 sub process_request_2
 {
-	my ($request, $peer) = @_;
+	my ($self, $request, $peer) = @_;
 
 	if ($request =~ /^over_limit (.*)$/)
 	{
-		return over_limit($1);
+		return $self->over_limit($1);
 	}
 	elsif ($request =~ /^get_stats (.*)$/)
 	{
-		return get_stats($1);
+		return $self->get_stats($1);
 	}
 	elsif ($request eq "get_size")
 	{
-		return get_size();
+		return $self->get_size();
 	}
 	elsif ($request eq "ping")
 	{
@@ -142,14 +164,14 @@ sub process_request_2
 
 sub over_limit
 {
-	my ($key) = @_;
+	my ($self, $key) = @_;
 
-	my ($over_limit, $rate, $limit, $period, $strict, $new_key, $keep_stats) = find_ratelimit_params($key);
+	my ($over_limit, $rate, $limit, $period, $strict, $new_key, $keep_stats) = $self->find_ratelimit_params($key);
 
-	($over_limit, $rate) = do_ratelimit($limit, $period, $new_key, 1, $strict)
+	($over_limit, $rate) = $self->do_ratelimit($limit, $period, $new_key, 1, $strict)
 		if not defined $over_limit;
 
-	keep_stats($limit, $period, $new_key, $over_limit, $rate)
+	$self->keep_stats($limit, $period, $new_key, $over_limit, $rate)
 		if $keep_stats;
 
 	return sprintf "ok %s %.1f %.1f %d",
@@ -158,7 +180,8 @@ sub over_limit
 
 sub find_ratelimit_params
 {
-	my ($key) = @_;
+	my ($self, $key) = @_;
+	my $orig_key = $key;
 
 	# The server - that's us - gets to decide what limits to impose for
 	# each key.  The idea is that this makes it easier to adjust the
@@ -232,7 +255,7 @@ sub find_ratelimit_params
 			if $key =~ /^ws ua=/;
 
 		# Default is to allow everything
-		print "Warning: using default key for >> over_limit $_[0]\n";
+		print "Warning: using default key for >> over_limit $orig_key\n";
 		$key = "default";
 		($over_limit, $rate, $limit, $period) = (0, 0, 1, 1);
 	}
@@ -244,37 +267,38 @@ use Carp qw( croak );
 
 # At the moment the data store is all in memory, though this could easily be
 # changed to something DBM-ish if that proves necessary.
-our %hash;
 
 sub get_size
 {
-	sprintf "size=%s keys=%d", scalar(%hash), scalar(keys %hash);
+	my ($self) = @_;
+	my $h = $self->hash;
+	sprintf "size=%s keys=%d", scalar(%$h), scalar(keys %$h);
 }
 
 # Idea and logic stolen from exim4 (acl.c, acl_ratelimit)
 sub do_ratelimit
 {
-	my ($limit, $period, $key, $use, $strict) = @_;
+	my ($self, $limit, $period, $key, $use, $strict) = @_;
 	$use = 1 if not defined $use;
 	$period > 0 or croak "Bad period";
 
 	printf "ratelimit condition limit=%.0f period=%.0f key=%s\n",
 		$limit, $period, $key,
-		if $verbose;
+		if $self->verbose;
 
 	no integer;
-	my $now = now();
+	my $now = $self->now();
 
 	my $dbd_time;
 	my $dbd_rate;
 	my $data;
 
-	if (not($data = $hash{$key}))
+	if (not($data = $self->hash->{$key}))
 	{
 		printf "ratelimit initializing new key's data\n"
-			if $verbose;
+			if $self->verbose;
 
-		$data = $hash{$key} = [ $now, 0 ];
+		$data = $self->hash->{$key} = [ $now, 0 ];
 		$dbd_time = $now;
 		$dbd_rate = 0;
 	}
@@ -301,62 +325,65 @@ sub do_ratelimit
 	}
 
 	printf "ratelimit computed rate=%s key=%s\n", $dbd_rate, $key
-		if $verbose;
+		if $self->verbose;
 
 	return(wantarray ? ($over_limit, $dbd_rate) : $over_limit);
 }
 
 {
-	my %n_req;
-	my %n_over;
-	my %max_rate;
-	my %last_max_rate;
-
 	sub keep_stats
 	{
-		my ($limit, $period, $key, $over_limit, $rate) = @_;
-		++$n_req{$key};
-		++$n_over{$key} if $over_limit;
-		$max_rate{$key} = $rate
-			if $rate > ($max_rate{$key}||0);
+		my ($self, $limit, $period, $key, $over_limit, $rate) = @_;
+		++$self->n_req->{$key};
+		++$self->n_over->{$key} if $over_limit;
+		$self->max_rate->{$key} = $rate
+			if $rate > ($self->max_rate->{$key}||0);
 	}
 
 	sub get_stats
 	{
-		my ($key) = @_;
-		my $n_req = $n_req{$key} || 0;
-		my $n_over = $n_over{$key} || 0;
+		my ($self, $key) = @_;
+		my $n_req = $self->n_req->{$key} || 0;
+		my $n_over = $self->n_over->{$key} || 0;
 		sprintf "n_req=%d n_over=%d last_max_rate=%d key=%s",
-			$n_req, $n_over, $last_max_rate{$key}||0, $key;
+			$n_req, $n_over, $self->last_max_rate->{$key}||0, $key;
 	}
 
 	sub clear_max_rate
 	{
-		%last_max_rate = %max_rate;
-		%max_rate = ();
+		my ($self) = @_;
+		$self->last_max_rate($self->max_rate);
+		$self->max_rate({});
 	}
 }
 
 {
-	my $next_bucket;
-
 	sub check_next_bucket
 	{
-		my $now = now();
-		if (not $next_bucket or $now >= $next_bucket)
+		my ($self) = @_;
+		my $now = $self->now;
+		if (not $self->next_bucket or $now >= $self->next_bucket)
 		{
-			clear_max_rate();
-			$next_bucket = $now + 300;
+			$self->clear_max_rate;
+			my $next_bucket = $now + 300;
 			$next_bucket -= ($next_bucket % 300);
-			$SIG{ALRM} = \&check_next_bucket;
+			$SIG{ALRM} = sub { $self->check_next_bucket };
 			my $in = ($next_bucket - $now);
 			print "new bucket started, will check again in $in sec\n";
+			$self->next_bucket($next_bucket);
 			alarm(($in > 1) ? $in : 1);
 		}
 	}
 }
 
-run(@ARGV) unless caller;
+unless (caller) {
+	@ARGV == 2 or die "Usage: $0 ADDR PORT\n";
+	RateLimitServer->new({
+		bind => shift(),
+		port => shift(),
+		verbose => $ENV{VERBOSE},
+	})->run;
+}
 
 1;
 # eof RateLimitServer.pm

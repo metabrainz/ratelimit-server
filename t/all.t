@@ -8,60 +8,72 @@ use Test::More tests => 8;
 
 require_ok("RateLimitServer");
 
+my $t = time;
+{
+	package MyRLS;
+	use base qw/ RateLimitServer /;
+	sub now { $t }
+}
+
 subtest "request id" => sub {
 	plan tests => 8;
 
+	my $rls = MyRLS->new;
 	my $req = "ping";
 	my $ans = "pong";
 
-	is RateLimitServer::process_request($req), $ans, "request without an id";
-	is RateLimitServer::process_request("27823 $req"), "27823 $ans", "request with an id";
-	is RateLimitServer::process_request("000867465 $req"), "000867465 $ans", "request with an id starting with zero";
-	is RateLimitServer::process_request("394769760968709384567 $req"), "394769760968709384567 $ans", "request with a large id";
+	is $rls->process_request($req), $ans, "request without an id";
+	is $rls->process_request("27823 $req"), "27823 $ans", "request with an id";
+	is $rls->process_request("000867465 $req"), "000867465 $ans", "request with an id starting with zero";
+	is $rls->process_request("394769760968709384567 $req"), "394769760968709384567 $ans", "request with a large id";
 
 	# Bad requests (ones that elicit no response) should always elicit no
 	# response, even if a request ID was given
 	$req = "no_such_command";
 	$ans = undef;
-	is RateLimitServer::process_request($req), $ans, "bad request without an id";
-	is RateLimitServer::process_request("27823 $req"), $ans, "bad request with an id";
-	is RateLimitServer::process_request("000867465 $req"), $ans, "bad request with an id starting with zero";
-	is RateLimitServer::process_request("394769760968709384567 $req"), $ans, "bad request with a large id";
+	is $rls->process_request($req), $ans, "bad request without an id";
+	is $rls->process_request("27823 $req"), $ans, "bad request with an id";
+	is $rls->process_request("000867465 $req"), $ans, "bad request with an id starting with zero";
+	is $rls->process_request("394769760968709384567 $req"), $ans, "bad request with a large id";
 };
 
 subtest "fussiness" => sub {
 	plan tests => 6;
 
-	is RateLimitServer::process_request("ping"), "pong", "ping";
-	is RateLimitServer::process_request("PING"), undef, "requests are case-sensitive";
-	is RateLimitServer::process_request(" ping"), undef, "requests are sensitive to leading space";
-	is RateLimitServer::process_request("ping "), undef, "requests are sensitive to trailing space";
+	my $rls = MyRLS->new;
 
-	is RateLimitServer::process_request("123 ping"), "123 pong", "ping with id";
-	is RateLimitServer::process_request("123  ping"), undef, "request id is sensitive to whitespace";
+	is $rls->process_request("ping"), "pong", "ping";
+	is $rls->process_request("PING"), undef, "requests are case-sensitive";
+	is $rls->process_request(" ping"), undef, "requests are sensitive to leading space";
+	is $rls->process_request("ping "), undef, "requests are sensitive to trailing space";
+
+	is $rls->process_request("123 ping"), "123 pong", "ping with id";
+	is $rls->process_request("123  ping"), undef, "request id is sensitive to whitespace";
 };
-
-# We'll be overriding things in the RateLimitServer package
-no warnings qw( redefine once );
-our $t = time();
-local *RateLimitServer::now = sub { $t };
 
 subtest "basic strict limit" => sub {
 	plan tests => 400;
 
-	my $key = "dummy";
+	our $key = "dummy";
 
-	local *RateLimitServer::find_ratelimit_params = sub {
-		$_[0] eq $key or die "unexpected key @_";
-	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
-		return (undef, undef, 22, 20, 1, $key, 0);
-	};
+	{
+		package MyRLSBasicStrict;
+		use base qw/ MyRLS /;
+		sub find_ratelimit_params {
+			my ($self, $k) = @_;
+			$k eq $key or die "unexpected key $k not $key";
+			# ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+			return (undef, undef, 22, 20, 1, $key, 0);
+		}
+	}
+
+	my $rls = MyRLSBasicStrict->new;
 
 	# 22 requests in 20 seconds, strict.
 
 	# Send 300 requests 1 second apart: they should all succeed
 	for (1..300) {
-		my $resp = RateLimitServer::process_request("over_limit $key");
+		my $resp = $rls->process_request("over_limit $key");
 		like $resp, qr/^ok N /, "under limit $_ of 300";
 		note $resp;
 		$t += 1;
@@ -70,7 +82,7 @@ subtest "basic strict limit" => sub {
 	# Now send 100 requests in 10 seconds, to force us over the limit
 	# The first few will succeed, the rest will fail
 	for (1..100) {
-		my $resp = RateLimitServer::process_request("over_limit $key");
+		my $resp = $rls->process_request("over_limit $key");
 		if ($_ <= 3) {
 			like $resp, qr/^ok N /, "under limit $_ of 300";
 		} else {
@@ -84,19 +96,26 @@ subtest "basic strict limit" => sub {
 subtest "basic leaky limit" => sub {
 	plan tests => 202;
 
-	my $key = "dummy";
+	our $key = "dummy";
 
-	local *RateLimitServer::find_ratelimit_params = sub {
-		$_[0] eq $key or die "unexpected key @_";
-	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
-		return (undef, undef, 125, 10, 0, $key, 0);
-	};
+	{
+		package MyRLSBasicLeaky;
+		use base qw/ MyRLS /;
+		sub find_ratelimit_params {
+			my ($self, $k) = @_;
+			$k eq $key or die "unexpected key $k not $key";
+			# ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+			return (undef, undef, 125, 10, 0, $key, 0);
+		}
+	}
+
+	my $rls = MyRLSBasicLeaky->new;
 
 	# 125 requests in 10 seconds, leaky.
 
 	# Send 200 requests over 20 seconds: they should all succeed
 	for (1..200) {
-		my $resp = RateLimitServer::process_request("over_limit $key");
+		my $resp = $rls->process_request("over_limit $key");
 		like $resp, qr/^ok N /, "under limit $_ of 300";
 		note $resp;
 		$t += 0.1;
@@ -106,7 +125,7 @@ subtest "basic leaky limit" => sub {
 	# Some will succeed, some will fail.
 	my @responses;
 	for (1..200) {
-		my $resp = RateLimitServer::process_request("over_limit $key");
+		my $resp = $rls->process_request("over_limit $key");
 		push @responses, $resp;
 		note $resp;
 		$t += 0.05;
@@ -122,47 +141,54 @@ subtest "basic leaky limit" => sub {
 subtest "get_size" => sub {
 	plan tests => 2;
 
-	local %RateLimitServer::hash = ();
+	my $rls = RateLimitServer->new;
 
-	like RateLimitServer::process_request("get_size"), qr/^size=\S+ keys=0$/, "starts off empty";
+	like $rls->process_request("get_size"), qr/^size=\S+ keys=0$/, "starts off empty";
 
-	RateLimitServer::do_ratelimit(10, 10, "key 1", 1, 0);
-	RateLimitServer::do_ratelimit(10, 10, "key 1", 1, 0);
-	RateLimitServer::do_ratelimit(10, 10, "key 3", 1, 0);
-	RateLimitServer::do_ratelimit(10, 10, "key 2", 1, 0);
+	$rls->do_ratelimit(10, 10, "key 1", 1, 0);
+	$rls->do_ratelimit(10, 10, "key 1", 1, 0);
+	$rls->do_ratelimit(10, 10, "key 3", 1, 0);
+	$rls->do_ratelimit(10, 10, "key 2", 1, 0);
 
-	like RateLimitServer::process_request("get_size"), qr/^size=\S+ keys=3$/, "after 3 keys";
+	like $rls->process_request("get_size"), qr/^size=\S+ keys=3$/, "after 3 keys";
 };
 
 subtest "stats" => sub {
 	plan tests => 3;
 
-	local *RateLimitServer::find_ratelimit_params = sub {
-	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+	{
+		package MyRLSStats;
+		use base qw/ MyRLS /;
+		sub find_ratelimit_params {
+			my ($self, $key) = @_;
+			# ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
 
-		return (undef, undef, 10, 1, 1, "key_without_stats")
-			if $_[0] eq "key_without_stats";
+			return (undef, undef, 10, 1, 1, "key_without_stats")
+				if $key eq "key_without_stats";
 
-		return (undef, undef, 10, 1, 1, "key_with_stats", 1)
-			if $_[0] eq "key_with_stats";
+			return (undef, undef, 10, 1, 1, "key_with_stats", 1)
+				if $key eq "key_with_stats";
 
-		die "unexpected key";
-	};
+			die "unexpected key";
+		}
+	}
 
-	is RateLimitServer::process_request("get_stats not_seen_yet"),
+	my $rls = MyRLSStats->new;
+
+	is $rls->process_request("get_stats not_seen_yet"),
 		"n_req=0 n_over=0 last_max_rate=0 key=not_seen_yet",
 		"not_seen_yet";
 
 	for (1..20) {
-		note RateLimitServer::process_request("over_limit key_without_stats");
-		note RateLimitServer::process_request("over_limit key_with_stats");
+		note $rls->process_request("over_limit key_without_stats");
+		note $rls->process_request("over_limit key_with_stats");
 	}
 
-	is RateLimitServer::process_request("get_stats key_without_stats"),
+	is $rls->process_request("get_stats key_without_stats"),
 		"n_req=0 n_over=0 last_max_rate=0 key=key_without_stats",
 		"stats for a key where we don't keep stats";
 
-	is RateLimitServer::process_request("get_stats key_with_stats"),
+	is $rls->process_request("get_stats key_with_stats"),
 		"n_req=20 n_over=9 last_max_rate=0 key=key_with_stats",
 		"stats for a key where we do keep stats";
 };
@@ -177,47 +203,54 @@ subtest "buckets" => sub {
 	++$t;
 	local $SIG{ALRM} = $SIG{ALRM};
 
-	local *RateLimitServer::find_ratelimit_params = sub {
-	    # ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
-		return (undef, undef, 22, 20, 0, $_[0], 1);
-	};
+	{
+		package MyRLSBuckets;
+		use base qw/ MyRLS /;
+		sub find_ratelimit_params {
+			my ($self, $key) = @_;
+			# ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+			return (undef, undef, 22, 20, 0, $key, 1);
+		}
+	}
+
+	my $rls = MyRLSBuckets->new;
 
 	# bucket #1
-	RateLimitServer::check_next_bucket();
+	$rls->check_next_bucket();
 
 	for (1..50) {
 		$t += 0.5;
-		note RateLimitServer::process_request("over_limit one");
+		note $rls->process_request("over_limit one");
 		$t += 0.5;
-		note RateLimitServer::process_request("over_limit one");
-		note RateLimitServer::process_request("over_limit two");
+		note $rls->process_request("over_limit one");
+		note $rls->process_request("over_limit two");
 	}
 	$t += 250;
 
-	is RateLimitServer::process_request("get_stats one"), "n_req=100 n_over=31 last_max_rate=0 key=one", "bucket #1 key one";
-	is RateLimitServer::process_request("get_stats two"), "n_req=50 n_over=0 last_max_rate=0 key=two", "bucket #1 key two";
+	is $rls->process_request("get_stats one"), "n_req=100 n_over=31 last_max_rate=0 key=one", "bucket #1 key one";
+	is $rls->process_request("get_stats two"), "n_req=50 n_over=0 last_max_rate=0 key=two", "bucket #1 key two";
 
 	# bucket #2
-	RateLimitServer::check_next_bucket();
+	$rls->check_next_bucket();
 
 	for (1..100) {
 		$t += 0.25;
-		note RateLimitServer::process_request("over_limit one");
+		note $rls->process_request("over_limit one");
 		$t += 0.25;
-		note RateLimitServer::process_request("over_limit one");
-		note RateLimitServer::process_request("over_limit two");
+		note $rls->process_request("over_limit one");
+		note $rls->process_request("over_limit two");
 	}
 	$t += 250;
 
 	# last_max_rate is for previous bucket, other stats are for this bucket
-	is RateLimitServer::process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #2 key one";
-	is RateLimitServer::process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=18 key=two", "bucket #2 key two";
+	is $rls->process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #2 key one";
+	is $rls->process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=18 key=two", "bucket #2 key two";
 
 	# bucket #3
-	RateLimitServer::check_next_bucket();
+	$rls->check_next_bucket();
 
-	is RateLimitServer::process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #3 key one";
-	is RateLimitServer::process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=22 key=two", "bucket #3 key two";
+	is $rls->process_request("get_stats one"), "n_req=300 n_over=158 last_max_rate=22 key=one", "bucket #3 key one";
+	is $rls->process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=22 key=two", "bucket #3 key two";
 };
 
 # TODO, "custom" things to test:

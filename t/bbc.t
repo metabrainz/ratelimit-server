@@ -8,9 +8,12 @@ use Test::More tests => 2;
 
 require_ok("RateLimitServer");
 
-no warnings qw( redefine once );
-our $t = time();
-local *RateLimitServer::now = sub { $t };
+my $t = time;
+{
+	package MyRLS;
+	use base qw/ RateLimitServer /;
+	sub now { $t }
+}
 
 # TODO, "custom" things to test:
 # request munging
@@ -18,11 +21,11 @@ local *RateLimitServer::now = sub { $t };
 subtest "bbc munging" => sub {
 	plan tests => 1;
 
-	local %RateLimitServer::hash = ();
+	my $rls = MyRLS->new;
 
-	note RateLimitServer::process_request("over_limit ws ip=132.185.0.0");
-	note RateLimitServer::process_request("over_limit ws ip=212.58.247.149");
-	my $s = RateLimitServer::get_stats("ws cust=bbc");
+	note $rls->process_request("over_limit ws ip=132.185.0.0");
+	note $rls->process_request("over_limit ws ip=212.58.247.149");
+	my $s = $rls->get_stats("ws cust=bbc");
 	note $s;
 	like $s, qr/\bn_req=2\b/, "bbc has two requests";
 };
