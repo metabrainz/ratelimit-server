@@ -4,7 +4,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 8;
+use Test::More tests => 9;
 
 require_ok("RateLimitServer");
 
@@ -253,5 +253,34 @@ subtest "buckets" => sub {
 	is $rls->process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=22 key=two", "bucket #3 key two";
 };
 
-# TODO, test request munging - should use new key for test & stats
+subtest "request munging" => sub {
+	plan tests => 9;
+
+	{
+		package MyRLSMunger;
+		use base qw/ RateLimitServer /;
+		sub find_ratelimit_params {
+			my ($self, $key) = @_;
+			# ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
+			$key =~ s/_.*//;
+			return (undef, undef, 22, 20, 0, $key, 1);
+		}
+	}
+
+	my $rls = MyRLSMunger->new;
+
+	# non-munged key
+	like $rls->process_request("over_limit one"), qr/^ok N 0/, "test one";
+	# munged keys
+	like $rls->process_request("over_limit two_a"), qr/^ok N 0/, "test two_a";
+	like $rls->process_request("over_limit two_b"), qr/^ok N 1/, "test two_b";
+	like $rls->process_request("over_limit three_a"), qr/^ok N 0/, "test three_a";
+	like $rls->process_request("over_limit three_b"), qr/^ok N 1/, "test three_b";
+	like $rls->process_request("over_limit three_c"), qr/^ok N 2/, "test three_c";
+
+	# Check that stats uses the munged key
+	like $rls->process_request("get_stats one"), qr/^n_req=1 /, "stats one";
+	like $rls->process_request("get_stats two"), qr/^n_req=2 /, "stats two";
+	like $rls->process_request("get_stats three"), qr/^n_req=3 /, "stats three";
+};
 
