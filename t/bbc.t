@@ -4,6 +4,7 @@
 use warnings;
 use strict;
 
+use Test::More 0.94;
 use Test::More tests => 2;
 
 require_ok("RateLimitServer");

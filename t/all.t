@@ -4,6 +4,7 @@
 use warnings;
 use strict;
 
+use Test::More 0.94; # need subtest
 use Test::More tests => 9;
 
 require_ok("RateLimitServer");
@@ -254,7 +255,7 @@ subtest "buckets" => sub {
 };
 
 subtest "request munging" => sub {
-	plan tests => 9;
+	plan tests => 10;
 
 	{
 		package MyRLSMunger;
@@ -282,5 +283,8 @@ subtest "request munging" => sub {
 	like $rls->process_request("get_stats one"), qr/^n_req=1 /, "stats one";
 	like $rls->process_request("get_stats two"), qr/^n_req=2 /, "stats two";
 	like $rls->process_request("get_stats three"), qr/^n_req=3 /, "stats three";
+
+	# The original keys should not have stats
+	like $rls->process_request("get_stats two_a"), qr/^n_req=0 /, "no stats for two_a";
 };
 
