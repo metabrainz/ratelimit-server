@@ -18,7 +18,7 @@ my $t = time;
 subtest "request id" => sub {
 	plan tests => 8;
 
-	my $rls = MyRLS->new;
+	my $rls = RateLimitServer->new;
 	my $req = "ping";
 	my $ans = "pong";
 
@@ -40,7 +40,7 @@ subtest "request id" => sub {
 subtest "fussiness" => sub {
 	plan tests => 6;
 
-	my $rls = MyRLS->new;
+	my $rls = RateLimitServer->new;
 
 	is $rls->process_request("ping"), "pong", "ping";
 	is $rls->process_request("PING"), undef, "requests are case-sensitive";
@@ -158,7 +158,7 @@ subtest "stats" => sub {
 
 	{
 		package MyRLSStats;
-		use base qw/ MyRLS /;
+		use base qw/ RateLimitServer /;
 		sub find_ratelimit_params {
 			my ($self, $key) = @_;
 			# ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
@@ -253,6 +253,5 @@ subtest "buckets" => sub {
 	is $rls->process_request("get_stats two"), "n_req=150 n_over=31 last_max_rate=22 key=two", "bucket #3 key two";
 };
 
-# TODO, "custom" things to test:
-# request munging
+# TODO, test request munging - should use new key for test & stats
 
