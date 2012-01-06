@@ -57,8 +57,6 @@ __PACKAGE__->mk_accessors(qw(
 use Time::HiRes qw( time );
 sub now { time() }
 
-our $verbose;
-
 sub new
 {
 	my ($class, @args) = @_;
