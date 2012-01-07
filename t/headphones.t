@@ -17,17 +17,21 @@ my $t = time;
 }
 
 subtest "headphones stats only" => sub {
-	plan tests => 101;
+	plan tests => 2;
 
 	my $rls = MyRLS->new;
 
 	for (1..100) {
-		like $rls->process_request("over_limit ws ua=python-headphones/0.7.3"),
-			qr/^ok N 0/, "not over limit, rate=0";
+		note $rls->process_request("over_limit ws ua=python-headphones/0.7.3");
+		note $rls->process_request("over_limit ws ua=python-musicbrainz/0.7.3");
 	}
 
 	my $s = $rls->get_stats("ws ua=python-headphones/0.7.3");
 	note $s;
 	is $s, "n_req=100 n_over=0 last_max_rate=0 key=ws ua=python-headphones/0.7.3", "has 100 requests";
+
+	$s = $rls->get_stats("ws ua=python-musicbrainz/0.7.3");
+	note $s;
+	is $s, "n_req=200 n_over=0 last_max_rate=0 key=ws ua=python-musicbrainz/0.7.3", "has 200 requests";
 };
 

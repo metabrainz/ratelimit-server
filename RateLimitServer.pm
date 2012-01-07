@@ -193,7 +193,8 @@ sub find_ratelimit_params
 
 	# keep stats on python-headphones/0.7.3 but without having the results
 	# affect the client
-	$self->keep_stats_only($key)
+	$self->keep_stats_only($key),
+		$key = "ws ua=python-musicbrainz/0.7.3"
 		if $key eq "ws ua=python-headphones/0.7.3";
 
 	my ($over_limit, $rate, $limit, $period, $strict, $keep_stats);
