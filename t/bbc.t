@@ -16,9 +16,6 @@ my $t = time;
 	sub now { $t }
 }
 
-# TODO, "custom" things to test:
-# request munging
-
 subtest "bbc munging" => sub {
 	plan tests => 1;
 
