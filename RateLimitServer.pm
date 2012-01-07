@@ -169,7 +169,7 @@ sub over_limit
 	($over_limit, $rate) = $self->do_ratelimit($limit, $period, $new_key, 1, $strict)
 		if not defined $over_limit;
 
-	$self->keep_stats($limit, $period, $new_key, $over_limit, $rate)
+	$self->keep_stats($new_key, $over_limit, $rate)
 		if $keep_stats;
 
 	return sprintf "ok %s %.1f %.1f %d",
@@ -331,7 +331,7 @@ sub do_ratelimit
 {
 	sub keep_stats
 	{
-		my ($self, $limit, $period, $key, $over_limit, $rate) = @_;
+		my ($self, $key, $over_limit, $rate) = @_;
 		++$self->n_req->{$key};
 		++$self->n_over->{$key} if $over_limit;
 		$self->max_rate->{$key} = $rate
