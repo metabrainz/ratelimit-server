@@ -98,6 +98,7 @@ SNMPAgentUtil->run(
 	&$do("default", "10.1.1.245", 2000, ["ws global", "ws ua=-", "ws ua=libvlc", "ws ua=nsplayer", "ws cust=bbc",
 		"ws ua=python-musicbrainz/0.7.3",
 		"ws ua=generic-bad-ua",
+		"ws ua=python-headphones/0.7.3",
 		]);
 
         $self->set_responses(@responses);

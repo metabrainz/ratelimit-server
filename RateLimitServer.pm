@@ -191,6 +191,11 @@ sub find_ratelimit_params
 	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
 
+	# keep stats on python-headphones/0.7.3 but without having the results
+	# affect the client
+	$self->keep_stats_only($key)
+		if $key eq "ws ua=python-headphones/0.7.3";
+
 	my ($over_limit, $rate, $limit, $period, $strict, $keep_stats);
 
 	{
@@ -326,6 +331,14 @@ sub do_ratelimit
 		if $self->verbose;
 
 	return(wantarray ? ($over_limit, $dbd_rate) : $over_limit);
+}
+
+sub keep_stats_only
+{
+	my ($self, $key) = @_;
+	# limit and period are arbitrary
+	my ($over_limit, $rate) = $self->do_ratelimit(3, 3, $key, 1, 1);
+	$self->keep_stats($key, 0, $rate);
 }
 
 {
