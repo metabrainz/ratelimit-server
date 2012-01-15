@@ -99,6 +99,11 @@ SNMPAgentUtil->run(
 		"ws ua=python-musicbrainz/0.7.3",
 		"ws ua=generic-bad-ua",
 		"ws ua=python-headphones/0.7.3",
+		"googlebot",
+		"banshee",
+		"picard",
+		"jaikoz",
+		"abelssoft",
 		]);
 
         $self->set_responses(@responses);
