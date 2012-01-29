@@ -238,7 +238,7 @@ sub find_ratelimit_params
 		$keep_stats = 1;
 
 		# MusicBrainz::Server::Handlers::WS::1::Common
-		($limit, $period, $strict) = (3000, 10, 0), last
+		($limit, $period, $strict) = (3500, 10, 0), last
 			if $key =~ /^ws global$/;
 
 		($limit, $period, $strict) = (30, 30, 0), last
