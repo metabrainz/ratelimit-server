@@ -214,7 +214,7 @@ sub find_ratelimit_params
 			if $key =~ /^(.*) cust=bbc$/;
 
 		# Web pages for humans
-		($limit, $period, $strict) = (22, 20, 1), last
+		($limit, $period, $strict) = (45, 20, 1), last
 			if $key =~ /^frontend ip=(\d+\.\d+\.\d+\.\d+)$/;
 
 		# MusicBrainz::Server::Handlers::WS::1::Common
