@@ -200,7 +200,7 @@ sub find_ratelimit_params
 		if $key =~ /\b(googlebot|banshee|picard|jaikoz|abelssoft)\b/i;
 
 	$key = "ws ua=python-musicbrainz/0.7.3"
-		if $key =~ /python-headphones/;
+		if $key =~ /headphones/i;
 
 	my ($over_limit, $rate, $limit, $period, $strict, $keep_stats);
 
