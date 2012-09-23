@@ -104,6 +104,7 @@ SNMPAgentUtil->run(
 		"picard",
 		"jaikoz",
 		"abelssoft",
+		"python-musicbrainz-ngs",
 		]);
 
         $self->set_responses(@responses);
