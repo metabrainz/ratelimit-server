@@ -212,21 +212,12 @@ sub check_limit
 sub extract_keys
 {
     my ($self, $parsed_json) = @_;
-
     my @keys;
 
-    $parsed_json->{origin} ||= 'unspecified';
+    $parsed_json->{origin} //= 'unspecified';
 
-    if ($parsed_json->{ua}) {
-        push @keys, sprintf "%s ua=%s", $parsed_json->{origin}, $parsed_json->{ua};
-    } else {
-        push @keys, sprintf "%s ua=", $parsed_json->{origin};
-    }
-
-    if ($parsed_json->{ip}) {
-        push @keys, sprintf "%s ip=%s", $parsed_json->{origin}, $parsed_json->{ip};
-    }
-
+    push @keys, sprintf "%s ua=%s", $parsed_json->{origin}, $parsed_json->{ua} // '';
+    push @keys, sprintf "%s ip=%s", $parsed_json->{origin}, $parsed_json->{ip};
     push @keys, sprintf "%s global", $parsed_json->{origin};
 
     return @keys;
