@@ -260,6 +260,26 @@ sub handle_stats_only
 		if $key =~ /\b(googlebot|banshee|picard|jaikoz|abelssoft|python-musicbrainz-ngs)\b/i;
 }
 
+my $processors = [
+    # BBC first, make sure their IPs get the high ratelimit
+    {match => qr{^(.*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
+    # Per-user ratelimits (strict)
+    {match => qr{^frontend ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 45, period => 20, strict => 1},
+    {match => qr{^ws ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
+    {match => qr{^search ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
+    # Shared ratelimits (leaky)
+    {match => qr{^ws global$}, limit => 3000, period => 10, stats => 1},
+    # Bad UAs
+    {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws ua=generic-bad-ua$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
+    {match => qr{^ws ua=nsplayer$}, limit => 125, period => 10, stats => 1},
+    {match => qr{^ws ua=-$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws ua=$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "none"},
+    # Finally, default. This will yell at you.
+    {match => qr{^.*$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "default"}
+];
+
 sub find_ratelimit_params
 {
 	my ($self, $key) = @_;
@@ -275,70 +295,20 @@ sub find_ratelimit_params
 
 	my ($over_limit, $rate, $limit, $period, $strict, $keep_stats);
 
-	{
-		#############################
-		# Per-user limits: strict
-		#############################
+    for my $processor (@$processors) {
+        if ($key =~ $processor->{match}) {
+            $limit = $processor->{limit};
+            $period = $processor->{period};
+            $keep_stats = $processor->{stats} // 0;
+            $strict = $processor->{strict} // 0;
+            $over_limit = $processor->{over_limit} if defined $processor->{over_limit};
+            $rate = $processor->{rate} if defined $processor->{rate};
+            $key = $processor->{key} if defined $processor->{key};
+            last;
+        }
+    }
 
-		# MBH-146 Give the BBC a high ratelimit
-		($limit, $period, $strict, $keep_stats) = (15*20, 20, 0, 1), last
-			if $key =~ /^(.*) cust=bbc$/;
-
-		# Web pages for humans
-		($limit, $period, $strict) = (45, 20, 1), last
-			if $key =~ /^frontend ip=(\d+\.\d+\.\d+\.\d+)$/;
-
-		# MusicBrainz::Server::Handlers::WS::1::Common
-		($limit, $period, $strict) = (22, 20, 1), last
-			if $key =~ /^ws ip=(\d+\.\d+\.\d+\.\d+)$/;
-
-		# Old web service (cgi-bin/*.pl)
-		($limit, $period, $strict) = (10, 30, 1), last
-			if $key =~ m{^/mm-2.1/Find\w+ ip=(\d+\.\d+\.\d+\.\d+)$};
-		($limit, $period, $strict) = (22, 20, 1), last
-			if $key =~ m{^/mm-2.1/\w+ ip=(\d+\.\d+\.\d+\.\d+)$};
-
-		# Public search server
-		($limit, $period, $strict) = (22, 20, 1), last
-			if $key =~ /^search ip=(\d+\.\d+\.\d+\.\d+)$/;
-
-		#############################
-		# Shared limits: not strict
-		#############################
-
-		$keep_stats = 1;
-
-		# MusicBrainz::Server::Handlers::WS::1::Common
-		($limit, $period, $strict) = (3000, 10, 0), last
-			if $key =~ /^ws global$/;
-
-		($limit, $period, $strict) = (30, 30, 0), last
-			if $key =~ m{^/mm-2.1/Find\w+ global$};
-		($limit, $period, $strict) = (100, 10, 0), last
-			if $key =~ m{^/mm-2.1/\w+ global$};
-
-		# Bad user-agents
-		($limit, $period, $strict) = (500, 10, 0), last
-			if $key eq "ws ua=python-musicbrainz/0.7.3";
-		($limit, $period, $strict) = (500, 10, 0), last
-			if $key eq "ws ua=generic-bad-ua";
-
-		# VLC -- was 100, 30
-		($limit, $period, $strict) = (125, 10, 0), last
-			if $key =~ /^ws ua=(libvlc)$/;
-		($limit, $period, $strict) = (125, 10, 0), last
-			if $key =~ /^ws ua=(nsplayer)$/;
-		# No UA
-		($limit, $period, $strict) = (500, 10, 0), last
-			if $key =~ /^ws ua=-$/;
-		($over_limit, $rate, $limit, $period, $key) = (0, 0, 1, 1, "none"), last
-			if $key =~ /^ws ua=/;
-
-		# Default is to allow everything
-		print "Warning: using default key for >> over_limit $orig_key\n";
-		$key = "default";
-		($over_limit, $rate, $limit, $period) = (0, 0, 1, 1);
-	}
+    print "Warning: using default key for >> over_limit $orig_key\n" if $key eq 'default';
 
 	return ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
 }
