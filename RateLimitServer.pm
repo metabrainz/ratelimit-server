@@ -55,6 +55,8 @@ __PACKAGE__->mk_accessors(qw(
 ));
 
 use Time::HiRes qw( time );
+use JSON;
+use List::Util qw( first );
 sub now { time() }
 
 sub new
@@ -142,7 +144,13 @@ sub process_request_2
 
 	if ($request =~ /^over_limit (.*)$/)
 	{
+		# old over_limit command which takes a key
 		return $self->over_limit($1);
+	}
+	elsif ($request =~ /^check_limit (.*)$/)
+	{
+		# new check_limit command takes JSON input
+		return $self->check_limit($1);
 	}
 	elsif ($request =~ /^get_stats (.*)$/)
 	{
@@ -174,6 +182,54 @@ sub over_limit
 
 	return sprintf "ok %s %.1f %.1f %d",
 		($over_limit ? "Y" : "N"), $rate, $limit, $period;
+}
+
+sub check_limit
+{
+	my ($self, $json) = @_;
+
+    # Parse JSON and determine keys to check and in what order
+    # Assumes $json is already utf-8 encoded (*not* a perl unicode string)
+    my $parsed = decode_json($json);
+    my @keys = $self->extract_keys($parsed);
+
+    my @results;
+    my $over_limit = 0;
+	for my $key (@keys) {
+        my $over_limit_result = $self->over_limit($key);
+
+        push @results, {key => $key, over_limit => $over_limit_result};
+        $over_limit = 1 if $over_limit_result =~ /^ok Y/;
+        last if $over_limit;
+	}
+
+    return sprintf "%s, %s, %s", 
+        $results[-1]->{over_limit},
+        encode_json(\@keys),
+        encode_json(\@results);
+}
+
+sub extract_keys
+{
+    my ($self, $parsed_json) = @_;
+
+    my @keys;
+
+    $parsed_json->{origin} ||= 'unspecified';
+
+    if ($parsed_json->{ua}) {
+        push @keys, sprintf "%s ua=%s", $parsed_json->{origin}, $parsed_json->{ua};
+    } else {
+        push @keys, sprintf "%s ua=", $parsed_json->{origin};
+    }
+
+    if ($parsed_json->{ip}) {
+        push @keys, sprintf "%s ip=%s", $parsed_json->{origin}, $parsed_json->{ip};
+    }
+
+    push @keys, sprintf "%s global", $parsed_json->{origin};
+
+    return @keys;
 }
 
 sub find_ratelimit_params
