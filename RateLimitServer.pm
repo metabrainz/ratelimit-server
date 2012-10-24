@@ -232,20 +232,26 @@ sub extract_keys
     return @keys;
 }
 
-sub find_ratelimit_params
+sub fixup_key
 {
 	my ($self, $key) = @_;
-	my $orig_key = $key;
-
-	# The server - that's us - gets to decide what limits to impose for
-	# each key.  The idea is that this makes it easier to adjust the
-	# limits on the fly - simply tweak this script and restart it.
-
 	$key =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
 	$key =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
 
 	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
+	return $key;
+}
+
+sub find_ratelimit_params
+{
+	my ($self, $key) = @_;
+	my $orig_key = $key;
+	$key = $self->fixup_key($key);
+
+	# The server - that's us - gets to decide what limits to impose for
+	# each key.  The idea is that this makes it easier to adjust the
+	# limits on the fly - simply tweak this script and restart it.
 
 	# keep stats on python-headphones/0.7.3 but without having the results
 	# affect the client
