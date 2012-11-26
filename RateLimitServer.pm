@@ -233,7 +233,8 @@ sub fixup_key
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
 
 	$key = "ws headphones"
-		if $key =~ /headphones/i;
+		if $key =~ /headphones/i
+		or $key =~ /python-musicbrainz-ngs\/0.3devMODIFIED/i;
 
 	return $key;
 }
@@ -261,8 +262,8 @@ my $processors = [
     # Shared ratelimits (leaky)
     {match => qr{^ws global$}, limit => 3000, period => 10, stats => 1},
     # Bad UAs
-    {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws headphones$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws ua=generic-bad-ua$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
     {match => qr{^ws ua=nsplayer$}, limit => 125, period => 10, stats => 1},
