@@ -99,6 +99,7 @@ SNMPAgentUtil->run(
 		"ws ua=python-musicbrainz/0.7.3",
 		"ws ua=generic-bad-ua",
 		"ws ua=python-headphones/0.7.3",
+		"ws headphones",
 		"googlebot",
 		"banshee",
 		"picard",
