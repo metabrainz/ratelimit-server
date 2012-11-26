@@ -232,7 +232,7 @@ sub fixup_key
 	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
 
-	$key = "ws ua=python-musicbrainz/0.7.3"
+	$key = "ws headphones"
 		if $key =~ /headphones/i;
 
 	return $key;
@@ -253,7 +253,7 @@ sub handle_stats_only
 
 my $processors = [
     # BBC first, make sure their IPs get the high ratelimit
-    {match => qr{^(.*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
+    {match => qr{^([^\s]*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
     # Per-user ratelimits (strict)
     {match => qr{^frontend ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 45, period => 20, strict => 1},
     {match => qr{^ws ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
@@ -262,6 +262,7 @@ my $processors = [
     {match => qr{^ws global$}, limit => 3000, period => 10, stats => 1},
     # Bad UAs
     {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws headphones$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws ua=generic-bad-ua$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
     {match => qr{^ws ua=nsplayer$}, limit => 125, period => 10, stats => 1},
