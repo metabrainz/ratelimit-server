@@ -1,5 +1,5 @@
 #!/bin/sh
 exec 2>&1 \
-        softlimit -m 40000000 \
+        softlimit -m 80000000 \
         setuidgid nobody \
         ./RateLimitServer.pm 10.1.1.245 2000
