@@ -106,6 +106,7 @@ SNMPAgentUtil->run(
 		"jaikoz",
 		"abelssoft",
 		"python-musicbrainz-ngs",
+		"xbmc",
 		]);
 
         $self->set_responses(@responses);
