@@ -262,7 +262,7 @@ my $processors = [
     # Shared ratelimits (leaky)
     {match => qr{^ws global$}, limit => 3500, period => 10, stats => 1},
     # Bad UAs
-    {match => qr{^ws headphones$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws headphones$}, limit => 300, period => 10, stats => 1},
     {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws ua=generic-bad-ua$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
