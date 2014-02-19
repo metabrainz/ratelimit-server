@@ -228,6 +228,7 @@ sub fixup_key
 	my ($self, $key) = @_;
 	$key =~ s/\bip=(132\.185\.\d+\.\d+)\b/cust=bbc/;
 	$key =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
+	$key =~ s/\bip=(207\.241\.2(2[4-9]|3[0-9])\.\d+)\b/cust=ia/;
 
 	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
@@ -253,8 +254,9 @@ sub handle_stats_only
 }
 
 my $processors = [
-    # BBC first, make sure their IPs get the high ratelimit
+    # BBC/IA first, make sure their IPs get the high ratelimit
     {match => qr{^([^\s]*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
+    {match => qr{^([^\s]*) cust=ia$}, limit => 220, period => 20, stats => 1},
     # Per-user ratelimits (strict)
     {match => qr{^frontend ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 45, period => 20, strict => 1},
     {match => qr{^ws ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
