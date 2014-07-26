@@ -236,7 +236,9 @@ sub fixup_key
 
 	$key = "ws headphones"
 		if $key =~ /headphones/i
-		or $key =~ /python-musicbrainz-ngs\/0\.\d+devMODIFIED/i;
+		or $key =~ /python-musicbrainz-?ngs\/0\.\d+devMODIFIED/i;
+
+    $key =~ s/python-musicbrainzngs/python-musicbrainz-ngs/;
 
 	return $key;
 }
