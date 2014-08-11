@@ -231,7 +231,7 @@ sub fixup_key
 	$key =~ s/\bip=(207\.241\.2(2[4-9]|3[0-9])\.\d+)\b/cust=ia/;
 	$key =~ s/\bip=(84\.45\.16\.4|81\.153\.103\.174)\b/cust=7d/;
 
-	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+))$}{ ua=generic-bad-ua}
+	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+)|Apache-HttpClient/UNAVAILABLE \(java 1.4\))$}{ ua=generic-bad-ua}
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
 
 	$key = "ws headphones"
