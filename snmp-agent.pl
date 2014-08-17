@@ -110,6 +110,7 @@ SNMPAgentUtil->run(
 		"xbmc",
         "ws cust=ia",
         "ws cust=7d",
+        "vox"
 		]);
 
         $self->set_responses(@responses);

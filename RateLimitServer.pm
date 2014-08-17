@@ -253,7 +253,7 @@ sub handle_stats_only
 		if $key eq "ws ua=python-headphones/0.7.3";
 
 	$self->keep_stats_only(lc $1)
-		if $key =~ /\b(googlebot|banshee|picard|jaikoz|abelssoft|python-musicbrainz-ngs|XBMC)\b/i;
+		if $key =~ /\b(googlebot|banshee|picard|jaikoz|abelssoft|python-musicbrainz-ngs|XBMC|VOX)\b/i;
 }
 
 my $processors = [
