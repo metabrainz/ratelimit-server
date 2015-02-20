@@ -230,6 +230,7 @@ sub fixup_key
 	$key =~ s/\bip=(212\.58\.2[2-5]\d\.\d+)\b/cust=bbc/;
 	$key =~ s/\bip=(207\.241\.2(2[4-9]|3[0-9])\.\d+)\b/cust=ia/;
 	$key =~ s/\bip=(84\.45\.16\.4|81\.153\.103\.174)\b/cust=7d/;
+	$key =~ s/\bip=(10\.1\.1\.[0-9]+)\b/internal/;
 
 	$key =~ s{ ua=([ -]*|((Java|Python-urllib|Jakarta Commons-HttpClient)/[0-9._]+)|Apache-HttpClient/UNAVAILABLE \(java 1.4\))$}{ ua=generic-bad-ua}
 		unless $key =~ m{\Q ua=python-musicbrainz/0.7.3\E};
@@ -261,6 +262,7 @@ my $processors = [
     {match => qr{^([^\s]*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
     {match => qr{^([^\s]*) cust=ia$}, limit => 220, period => 20, stats => 1},
     {match => qr{^([^\s]*) cust=7d$}, limit => 220, period => 20, stats => 1},
+    {match => qr{^([^\s]*) internal$}, limit => 2000, period => 20, stats => 1},
     # Per-user ratelimits (strict)
     {match => qr{^frontend ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 45, period => 20, strict => 1},
     {match => qr{^ws ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
