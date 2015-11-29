@@ -20,6 +20,13 @@ Installation:
 
 See https://bitbucket.org/metabrainz/gateway-chef/src/master/cookbooks/ratelimit/
 
+It depends on JSON perl module.
+It can be install on Debian/Ubuntu systems using:
+
+```
+sudo apt-get install libjson-perl
+```
+
 
 Logs
 ====
