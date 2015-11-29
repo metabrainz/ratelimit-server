@@ -59,6 +59,36 @@ use JSON;
 use List::Util qw( first );
 sub now { time() }
 
+my $global_limit = 2500;
+if (defined $ENV{GLOBAL_LIMIT}) {
+	$global_limit = $ENV{GLOBAL_LIMIT}
+}
+
+my $processors = [
+    # BBC/IA first, make sure their IPs get the high ratelimit
+    {match => qr{^([^\s]*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
+    {match => qr{^([^\s]*) cust=ia$}, limit => 220, period => 20, stats => 1},
+    {match => qr{^([^\s]*) cust=7d$}, limit => 220, period => 20, stats => 1},
+    {match => qr{^([^\s]*) internal$}, limit => 2000, period => 20, stats => 1},
+    # Per-user ratelimits (strict)
+    {match => qr{^frontend ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 45, period => 20, strict => 1},
+    {match => qr{^ws ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
+    {match => qr{^search ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
+    # Shared ratelimits (leaky)
+    {match => qr{^ws global$}, limit => $global_limit, period => 10, stats => 1},
+    # Bad UAs
+    {match => qr{^ws headphones$}, limit => 300, period => 10, stats => 1},
+    {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws ua=generic-bad-ua$}, limit => 100, period => 10, stats => 1},
+    {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
+    {match => qr{^ws ua=nsplayer$}, limit => 125, period => 10, stats => 1},
+    {match => qr{^ws ua=-$}, limit => 500, period => 10, stats => 1},
+    {match => qr{^ws ua=$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "none"},
+    # Finally, default. This will yell at you.
+    {match => qr{^.*$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "default"}
+];
+
+
 sub new
 {
 	my ($class, @args) = @_;
@@ -88,6 +118,7 @@ sub run
 
 	$| = 1;
 	print "starting\n";
+	printf "global_limit %d\n", $global_limit;
 
 	$self->check_next_bucket;
 
@@ -256,30 +287,6 @@ sub handle_stats_only
 	$self->keep_stats_only(lc $1)
 		if $key =~ /\b(googlebot|banshee|picard|jaikoz|abelssoft|python-musicbrainz-ngs|XBMC|VOX)\b/i;
 }
-
-my $processors = [
-    # BBC/IA first, make sure their IPs get the high ratelimit
-    {match => qr{^([^\s]*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
-    {match => qr{^([^\s]*) cust=ia$}, limit => 220, period => 20, stats => 1},
-    {match => qr{^([^\s]*) cust=7d$}, limit => 220, period => 20, stats => 1},
-    {match => qr{^([^\s]*) internal$}, limit => 2000, period => 20, stats => 1},
-    # Per-user ratelimits (strict)
-    {match => qr{^frontend ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 45, period => 20, strict => 1},
-    {match => qr{^ws ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
-    {match => qr{^search ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
-    # Shared ratelimits (leaky)
-    {match => qr{^ws global$}, limit => 3500, period => 10, stats => 1},
-    # Bad UAs
-    {match => qr{^ws headphones$}, limit => 300, period => 10, stats => 1},
-    {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
-    {match => qr{^ws ua=generic-bad-ua$}, limit => 100, period => 10, stats => 1},
-    {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
-    {match => qr{^ws ua=nsplayer$}, limit => 125, period => 10, stats => 1},
-    {match => qr{^ws ua=-$}, limit => 500, period => 10, stats => 1},
-    {match => qr{^ws ua=$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "none"},
-    # Finally, default. This will yell at you.
-    {match => qr{^.*$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "default"}
-];
 
 sub find_ratelimit_params
 {
