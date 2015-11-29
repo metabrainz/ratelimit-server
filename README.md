@@ -1,34 +1,65 @@
 Execution
 =========
 
-bind addr and port are specified in the ./run script (arguments to ratelimit-server).
+`RateLimiter.pm [bind addr] [port]`
+
+Arguments:
+----------
+
+* `bind addr` is the ip address to
+* `port` is udp port to listen to
+
+Environment variables:
+----------------------
+
+* `VERBOSE` increases log verbosity
+
+
+Installation:
+=============
+
+See https://bitbucket.org/metabrainz/gateway-chef/src/master/cookbooks/ratelimit/
+
+It depends on JSON perl module.
+It can be install on Debian/Ubuntu systems using:
+
+```
+sudo apt-get install libjson-perl
+```
+
 
 Logs
 ====
 
-"tail -F -s 0.1 log/main/current | tain64local" - tail the busy log (all
+`tail -F -s 0.1 log/main/current | tai64nlocal` - tail the busy log (all
 requests/responses)
 
-"tail -F -s 0.1 log/quiet/current | tain64local" - tail the quiet log
+`tail -F -s 0.1 log/quiet/current | tai64nlocal` - tail the quiet log
 (excludes requests/responses, so this is just start/stop/error, etc)
 
 Monitoring
 ==========
 
-"./top" - every 10 seconds, shows the most-requested keys, their rates,
+`./top` - every 10 seconds, shows the most-requested keys, their rates,
 limits, what proportion of requests are being denied, etc.
 
 Debugging
 =========
 
-"./request COMMAND ..." - simple hook to send a request to the ratelimit-server
+`./request COMMAND ...` - simple hook to send a request to the ratelimit-server
 e.g.
+
+```
 	./request get_size
+```
 
 Slightly less crap version:
-"./ratelimit-client ADDR PORT QUERY"
+`./ratelimit-client ADDR PORT QUERY`
 e.g.
+
+```
 	"./ratelimit-client 10.1.1.245 2000 get_size"
+```
 
 snmp
 ====
