@@ -43,7 +43,6 @@ package RateLimitServer;
 
 use base qw/ Class::Accessor::Fast /;
 __PACKAGE__->mk_accessors(qw(
-	verbose
 	bind
 	port
 	hash
@@ -59,40 +58,13 @@ use JSON;
 use List::Util qw( first );
 sub now { time() }
 
-my $global_limit = 2500;
-if (defined $ENV{GLOBAL_LIMIT}) {
-	$global_limit = $ENV{GLOBAL_LIMIT}
-}
-
-my $processors = [
-    # BBC/IA first, make sure their IPs get the high ratelimit
-    {match => qr{^([^\s]*) cust=bbc$}, limit => 15*20, period => 20, stats => 1},
-    {match => qr{^([^\s]*) cust=ia$}, limit => 220, period => 20, stats => 1},
-    {match => qr{^([^\s]*) cust=7d$}, limit => 220, period => 20, stats => 1},
-    {match => qr{^([^\s]*) internal$}, limit => 2000, period => 20, stats => 1},
-    # Per-user ratelimits (strict)
-    {match => qr{^frontend ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 45, period => 20, strict => 1},
-    {match => qr{^ws ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
-    {match => qr{^search ip=(\d+\.\d+\.\d+\.\d+)$}, limit => 22, period => 20, strict => 1},
-    # Shared ratelimits (leaky)
-    {match => qr{^ws global$}, limit => $global_limit, period => 10, stats => 1},
-    # Bad UAs
-    {match => qr{^ws headphones$}, limit => 300, period => 10, stats => 1},
-    {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
-    {match => qr{^ws ua=generic-bad-ua$}, limit => 100, period => 10, stats => 1},
-    {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
-    {match => qr{^ws ua=nsplayer$}, limit => 125, period => 10, stats => 1},
-    {match => qr{^ws ua=-$}, limit => 500, period => 10, stats => 1},
-    {match => qr{^ws ua=$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "none"},
-    # Finally, default. This will yell at you.
-    {match => qr{^.*$}, over_limit => 0, rate => 0, limit => 1, period => 1, stats => 1, key => "default"}
-];
 
 
 sub new
 {
 	my ($class, @args) = @_;
 	my $self = $class->SUPER::new(@args);
+	$self->{_config} = undef;
 	$self->hash({});
 	$self->n_req({});
 	$self->n_over({});
@@ -101,9 +73,44 @@ sub new
 	return $self;
 }
 
+sub read_config
+{
+	my $self = shift;
+
+	my $config_file = './ratelimit.conf.json';
+	if (defined $ENV{CONFIG_FILE}) {
+		$config_file = $ENV{CONFIG_FILE}
+	}
+	printf "Loading config from %s\n", $config_file;
+
+	my $json_text = do {
+		open(my $json_fh, "<:encoding(UTF-8)", $config_file)
+		or die("Can't open $config_file: $!\n");
+		local $/;
+		<$json_fh>
+	};
+
+	my $json = JSON->new;
+	my $conf = $json->decode($json_text);
+	if (not defined $conf->{verbosity}) {
+		$conf->{verbosity} = 1;
+	}
+	printf "Verbosity: %d\n", $conf->{verbosity};
+	for ( @{$conf->{processors}} ) {
+		my $regex = $_->{match};
+		printf "Processor: %s %.0f/%.0fs\n", $regex, $_->{limit}, $_->{period}
+			if $conf->{verbosity} gt 0;
+		$_->{match} = qr/$regex/;
+	}
+	$self->{_config} = $conf;
+}
+
 sub run
 {
 	my $self = shift;
+	print "starting\n";
+
+	$self->read_config();
 
 	use IO::Socket::INET;
 	my $sock = IO::Socket::INET->new(
@@ -113,18 +120,23 @@ sub run
 	) or die $!;
 
 	my $stop = 0;
+	my $reload_config = 0;
+	$SIG{HUP} = sub { $reload_config = 1 };
 	$SIG{TERM} = sub { $stop = 1 };
 	$SIG{INT} = $SIG{TERM} if -t;
 
 	$| = 1;
-	print "starting\n";
-	printf "global_limit %d\n", $global_limit;
 
 	$self->check_next_bucket;
 
 	for (;;)
 	{
 		last if $stop;
+
+		if ($reload_config) {
+			$reload_config = 0;
+			$self->read_config();
+		}
 
 		my $request;
 		my $peer = recv($sock, $request, 1000, 0);
@@ -135,14 +147,16 @@ sub run
 		}
 
 		print ">> $request\n"
-			if $self->verbose;
+			if $self->{_config}->{verbosity} gt 1;
 		my $reply = $self->process_request($request, $peer);
 		if (not defined $reply)
 		{
-			print "no reply (>> $request)\n";
+			print "no reply (>> $request)\n"
+				if $self->{_config}->{verbosity} gt 0;
 			next;
 		}
-		print "<< $reply (>> $request)\n";
+		print "<< $reply (>> $request)\n"
+			if $self->{_config}->{verbosity} gt 0;
 
 		my $r = send($sock, $reply, 0, $peer);
 		defined($r) or die "send: $!";
@@ -303,7 +317,7 @@ sub find_ratelimit_params
 
 	my ($over_limit, $rate, $limit, $period, $strict, $keep_stats);
 
-    for my $processor (@$processors) {
+    for my $processor (@{$self->{_config}->{processors}}) {
         if ($key =~ $processor->{match}) {
             $limit = $processor->{limit};
             $period = $processor->{period};
@@ -316,8 +330,8 @@ sub find_ratelimit_params
         }
     }
 
-    print "Warning: using default key for >> over_limit $orig_key\n" if $key eq 'default';
-
+    print "Warning: using default key for >> over_limit $orig_key\n"
+		if $key eq 'default' and $self->{_config}->{verbosity} gt 1;
 	return ($over_limit, $rate, $limit, $period, $strict, $key, $keep_stats);
 }
 
@@ -340,9 +354,9 @@ sub do_ratelimit
 	$use = 1 if not defined $use;
 	$period > 0 or croak "Bad period";
 
-	printf "ratelimit condition limit=%.0f period=%.0f key=%s\n",
+	printf "ratelimit condition limit=%.0f period=%.0f key='%s'\n",
 		$limit, $period, $key,
-		if $self->verbose;
+		if $self->{_config}->{verbosity} gt 1;
 
 	no integer;
 	my $now = $self->now();
@@ -353,8 +367,8 @@ sub do_ratelimit
 
 	if (not($data = $self->hash->{$key}))
 	{
-		printf "ratelimit initializing new key's data\n"
-			if $self->verbose;
+		printf "ratelimit initializing new key's data for key '%s'\n", $key
+			if $self->{_config}->{verbosity} gt 1;
 
 		$data = $self->hash->{$key} = [ $now, 0 ];
 		$dbd_time = $now;
@@ -382,8 +396,8 @@ sub do_ratelimit
 		$data->[1] = $dbd_rate;
 	}
 
-	printf "ratelimit computed rate=%s key=%s\n", $dbd_rate, $key
-		if $self->verbose;
+	printf "ratelimit computed rate=%s key='%s'\n", $dbd_rate, $key
+		if $self->{_config}->{verbosity} gt 1;
 
 	return(wantarray ? ($over_limit, $dbd_rate) : $over_limit);
 }
@@ -435,7 +449,7 @@ sub keep_stats_only
 			$next_bucket -= ($next_bucket % 300);
 			$SIG{ALRM} = sub { $self->check_next_bucket };
 			my $in = ($next_bucket - $now);
-			print "new bucket started, will check again in $in sec\n";
+			print "new bucket started, will check again in $in secs\n";
 			$self->next_bucket($next_bucket);
 			alarm(($in > 1) ? $in : 1);
 		}
@@ -447,7 +461,6 @@ unless (caller) {
 	RateLimitServer->new({
 		bind => shift(),
 		port => shift(),
-		verbose => $ENV{VERBOSE},
 	})->run;
 }
 

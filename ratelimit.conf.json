@@ -1,0 +1,115 @@
+{
+  // 0=quiet 1=normal 2=verbose
+  "verbosity": 1,
+
+  // Processors
+  "processors":[
+    // BBC/IA first, make sure their IPs get the high ratelimit
+    {
+      "match": "^([^\\s]*) cust=bbc$",
+      "limit": 300,
+      "period": 20,
+      "stats": 1
+    },
+    {
+      "match": "^([^\\s]*) cust=ia$",
+      "limit": 220,
+      "period": 20,
+      "stats": 1
+    },
+    {
+      "match": "^([^\\s]*) cust=7d$",
+      "limit": 220,
+      "period": 20,
+      "stats": 1
+    },
+    {
+      "match": "^([^\\s]*) internal$",
+      "limit": 2000,
+      "period": 20,
+      "stats": 1
+    },
+    // Per-user ratelimits (strict)
+    {
+      "match": "^frontend ip=(\\d+\\.\\d+\\.\\d+\\.\\d+)$",
+      "limit": 45,
+      "period": 20,
+      "strict": 1
+    },
+    {
+      "match": "^ws ip=(\\d+\\.\\d+\\.\\d+\\.\\d+)$",
+      "limit": 22,
+      "period": 20,
+      "strict": 1
+    },
+    {
+      "match": "^search ip=(\\d+\\.\\d+\\.\\d+\\.\\d+)$",
+      "limit": 22,
+      "period": 20,
+      "strict": 1
+    },
+    // Shared ratelimits (leaky)
+    {
+      "match": "^ws global$",
+      "limit": 150,
+      "period": 10,
+      "stats": 1
+    },
+    // Bad UAs
+    {
+      "match": "^ws headphones$",
+      "limit": 300,
+      "period": 10,
+      "stats": 1
+    },
+    {
+      "match": "^ws ua=python-musicbrainz/0\\.7\\.3$",
+      "limit": 500,
+      "period": 10,
+      "stats": 1
+    },
+    {
+      "match": "^ws ua=generic-bad-ua$",
+      "limit": 100,
+      "period": 10,
+      "stats": 1
+    },
+    {
+      "match": "^ws ua=libvlc$",
+      "limit": 125,
+      "period": 10,
+      "stats": 1
+    },
+    {
+      "match": "^ws ua=nsplayer$",
+      "limit": 125,
+      "period": 10,
+      "stats": 1
+    },
+    {
+      "match": "^ws ua=-$",
+      "limit": 500,
+      "period": 10,
+      "stats": 1
+    },
+    {
+      "match": "^ws ua=$",
+      "over_limit": 0,
+      "rate": 0,
+      "limit": 1,
+      "period": 1,
+      "stats": 1,
+      "key": "none"
+    },
+    // Finally, default. This will yell at you.
+    {
+      "match": "^.*$",
+      "over_limit": 0,
+      "rate": 0,
+      "limit": 1,
+      "period": 1,
+      "stats": 1,
+      "key": "default"
+    }
+]
+}
