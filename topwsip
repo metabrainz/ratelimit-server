@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+# vi: set ts=4 sw=4 :
+
+use warnings;
+use strict;
+
+open(my $log, "tail --follow=name log/main/current |")
+	or die $!;
+my %top_keys;
+my $top_n = 100;
+my $refresh = 20;
+my $tolerance = 1.5; # tolerance over limit
+my $maxloop = 10;
+
+my $loop = 0;
+my $draw = 0;
+my $sig = sub { ++$draw; };
+$SIG{ALRM} = $sig;
+alarm($refresh);
+
+print <<EOF;
+Columns are:
+  numreq - the number of requests for this key (since the last data shown)
+  numovr - the number of those (numreq) requests which yielded a "you are over the limit" response
+  pctovr - numovr/numreq (as a percentage)
+  rate - the current request rate for this key (requests per period, smoothed)
+  limit - rate limit for this key (max allowed requests per period)
+  period - see rate & limit
+  key - the key in question
+
+Data is shown every $refresh seconds, $maxloop draws.
+
+EOF
+
+$|++;
+
+while ($loop < $maxloop)
+{
+	my $l = <$log>;
+	if (defined $l)
+	{
+		# @t << ok Y 60.3 60.0 30 (>> over_limit ws ip=24.84.58.52)
+		if (my ($over, $curr, $lim, $per, $key) = $l =~ /^\@\S+ << \d+ ok ([YN]) (\S+) (\S+) (\d+) \(>> \d+ over_limit (ws ip=.*)\)/)
+		{
+			my $e = ($top_keys{$key} ||= { k => $key, o => 0, l => $lim, p => $per });
+			++$e->{n};
+			++$e->{o} if $over eq "Y";
+			$e->{c} = $curr;
+		}
+	}
+
+	if ($draw)
+	{
+		delete $top_keys{$_} for grep { $top_keys{$_}{c} <= $top_keys{$_}{l}*1.5 } keys(%top_keys);
+		my @e = sort { $b->{c} <=> $a->{c} or $a->{k} cmp $b->{k} } values %top_keys;
+		splice(@e, $top_n) if @e > $top_n;
+
+		if (@e)
+		{
+			print "Top $top_n keys requested in the $refresh seconds leading up to ".gmtime()." UTC\n";
+			print "Having rate over $tolerance times the limit rate, only ws ip\n\n";
+			printf "%6s  %6s  %6s  %6s  %6s  %6s  %s\n",
+				qw( numreq numovr pctovr rate limit period key );
+			printf "%6d  %6d  %6.2f  %6.2f  %6.2f  %6.2f  %s\n",
+				$_->{n},
+				$_->{o},
+				100 * $_->{o} / $_->{n},
+				$_->{c},
+				$_->{l},
+				$_->{p},
+				$_->{k},
+				for @e;
+			print "\n";
+		}
+
+		$draw = 0;
+		++$loop;
+		$SIG{ALRM} = $sig;
+		%top_keys = ();
+		alarm($refresh);
+	}
+}
+
+# eof top
