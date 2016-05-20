@@ -78,7 +78,6 @@ my $processors = [
     {match => qr{^ws global$}, limit => $global_limit, period => 10, stats => 1},
     # Bad UAs
     {match => qr{^ws headphones$}, limit => 300, period => 10, stats => 1},
-    {match => qr{^ws ua=com\.djit\.equalizerplusforandroid}, limit => 50, period => 10, stats => 1},
     {match => qr{^ws ua=python-musicbrainz/0\.7\.3$}, limit => 500, period => 10, stats => 1},
     {match => qr{^ws ua=generic-bad-ua$}, limit => 100, period => 10, stats => 1},
     {match => qr{^ws ua=libvlc$}, limit => 125, period => 10, stats => 1},
